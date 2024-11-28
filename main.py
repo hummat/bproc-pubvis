@@ -7,6 +7,9 @@ import fire
 from PIL import Image
 import numpy as np
 import trimesh
+import matplotlib.pyplot as plt
+
+COLORS = {'pale_blue': (0.2, 0.3, 1)}
 
 
 def run(obj_path: str,
@@ -14,53 +17,96 @@ def run(obj_path: str,
         rotate: Optional[Tuple[float, float, float]] = None,
         shade: Literal['flat', 'smooth', 'auto'] = 'flat',
         set_material: bool = True,
+        color: Optional[Tuple[float, float, float] | Literal['pale_blue'] | str] = None,
+        roughness: float = 0.9,
+        mesh_as_pcd: bool = False,
         point_size: float = 0.004,
-        cam_location: Iterable[float] = (1.6, 0, 1.2),
-        resolution: Tuple[int, int] = (512, 512),
+        light: Optional[Literal['simple', 'three_point']] = 'simple',
+        cam_location: Iterable[float] = (1.6, 1, 1.2),
+        resolution: int | Tuple[int, int] = 512,
         backdrop: bool = True,
         background_light: float = 0.1,
         transparent: bool = True,
-        shadow: bool = True,
+        shadow: Optional[Literal['hard', 'medium', 'soft', 'none']] = None,
+        ambient_occlusion: Optional[float] = None,
         engine: Literal['cycles, eevee'] = 'cycles',
         noise_threshold: float = 0.01,
         samples: int = 100,
         show: bool = True):
-    init_renderer(resolution, transparent, engine, noise_threshold, samples)
+    init_renderer(resolution=resolution,
+                  transparent=transparent,
+                  engine=engine,
+                  noise_threshold=noise_threshold,
+                  samples=samples)
 
-    data = load_data(obj_path, normalize, rotate)
+    data = load_data(obj_path=obj_path,
+                     normalize=normalize,
+                     rotate=rotate,
+                     mesh_as_pcd=mesh_as_pcd)
+    obj = make_obj(mesh_or_pcd=data)
+
+    if set_material or not obj.get_materials():
+        obj.new_material('obj_material')
+    modify_material(obj=obj,
+                    color=color or ('pale_blue' if isinstance(data, trimesh.Trimesh) else 'pointflow'),
+                    roughness=roughness)
+
     if isinstance(data, trimesh.Trimesh):
-        obj = make_mesh(data, set_material, shade)
+        init_mesh(obj=obj,
+                  shade=shade)
     elif isinstance(data, trimesh.PointCloud):
-        obj = make_pointcloud(data.vertices, point_size, set_material, use_instance=False, use_particle_system=True)
+        init_pointcloud(obj=obj,
+                        point_size=point_size,
+                        use_instance=False,
+                        use_particle_system=False)
     else:
         raise ValueError(f"Invalid object type: {type(data)}")
 
-    if backdrop and not (transparent and not shadow):
-        make_backdrop(obj, shadow, transparent)
+    if backdrop and not (transparent and shadow == 'none'):
+        load_and_init_backdrop(obj=obj,
+                               shadow=shadow != 'none',
+                               transparent=transparent)
 
-    make_lights(background_light)
-    make_camera(np.array(cam_location), obj)
-    render(show)
+    if ambient_occlusion:
+        add_ambient_occlusion(obj=obj,
+                              distance=ambient_occlusion or (0.5 if isinstance(data, trimesh.Trimesh) else 0))
+
+    if light:
+        make_lights(light_setup=light,
+                    shadow=shadow or ('medium' if isinstance(data, trimesh.Trimesh) else 'soft'),
+                    background_light=background_light)
+    make_camera(cam_location=np.array(cam_location),
+                obj=obj)
+    render(show=show)
 
 
-def init_renderer(resolution: Tuple[int, int],
+def init_renderer(resolution: int | Tuple[int, int],
                   transparent: bool = True,
                   engine: Literal['cycles, eevee'] = 'cycles',
                   noise_threshold: float = 0.01,
                   samples: int = 100):
     bproc.init()
-    if transparent:
-        bproc.renderer.set_output_format(enable_transparency=True)
+    bproc.renderer.set_output_format(enable_transparency=transparent,
+                                     view_transform='Filmic',
+                                     look='Very Low Contrast')
     if engine == 'cycles':
         bproc.renderer.set_noise_threshold(noise_threshold)
         bproc.renderer.set_max_amount_of_samples(samples)
+    if isinstance(resolution, int):
+        resolution = (resolution, resolution)
     bproc.camera.set_resolution(*resolution)
 
 
 def load_data(obj_path: Path | str,
               normalize: bool = True,
-              rotate: Optional[Tuple[float, float, float]] = None) -> trimesh.Trimesh | trimesh.PointCloud:
-    mesh = trimesh.load(obj_path, force='mesh')
+              rotate: Optional[Tuple[float, float, float]] = None,
+              mesh_as_pcd: bool | int = False) -> trimesh.Trimesh | trimesh.PointCloud:
+    if Path(obj_path).suffix == '.blend':
+        mesh = bproc.loader.load_blend(obj_path, obj_types='mesh')[0].mesh_as_trimesh()
+        if not mesh.faces:
+            mesh = trimesh.PointCloud(mesh.vertices)
+    else:
+        mesh = trimesh.load(obj_path, force='mesh')
     if not isinstance(mesh, (trimesh.Trimesh, trimesh.PointCloud)):
         raise TypeError(f"Invalid object type: {type(mesh)}")
     if normalize:
@@ -71,41 +117,90 @@ def load_data(obj_path: Path | str,
             direction = np.zeros(3)
             direction[i] = 1
             mesh.apply_transform(trimesh.transformations.rotation_matrix(np.deg2rad(angle), direction))
+    if isinstance(mesh, trimesh.Trimesh) and mesh_as_pcd:
+        return trimesh.PointCloud(mesh.sample(mesh_as_pcd if mesh_as_pcd > 1 else 2048))
     return mesh
 
 
-def make_backdrop(obj: MeshObjectUtility.MeshObject,
-                  shadow: bool = True,
-                  transparent: bool = True):
-    backdrop_path = Path(__file__).parent / 'backdrop.ply'
-    plane = bproc.loader.load_obj(str(backdrop_path))[0]
+def set_color(obj: MeshObjectUtility.MeshObject,
+              color: Tuple[float, float, float] | Literal['pale_blue'] | str) -> MeshObjectUtility.Material:
+    material = obj.get_materials()[0]
+    if isinstance(color, str):
+        if color in COLORS:
+            material.set_principled_shader_value('Base Color', [*COLORS[color], 1])
+        else:
+            values = obj.mesh_as_trimesh().vertices
+            colors = list()
+            if color == 'pointflow':
+                def cmap(x, y, z):
+                    vec = np.array([x, y, z])
+                    vec = np.clip(vec, 0.001, 1.0)
+                    norm = np.sqrt(np.sum(vec ** 2))
+                    vec /= norm
+                    return [vec[0], vec[1], vec[2], 1]
+
+                for value in values:
+                    colors.append(cmap(*value))
+            else:
+                cmap = plt.get_cmap(color)
+                for value in values:
+                    x_values = values[:, 0]
+                    x_value_norm = (value[0] - x_values.min()) / (x_values.max() - x_values.min())
+                    colors.append(cmap(x_value_norm))
+
+            # Todo: Is this possible with BlenderProc?
+            mesh = obj.get_mesh()
+            color_attr_name = "point_color"
+            mesh.attributes.new(name=color_attr_name, type='FLOAT_COLOR', domain='POINT')
+
+            color_data = mesh.attributes[color_attr_name].data
+            for i, color in enumerate(colors):
+                color_data[i].color = color
+
+            attribute_node = material.new_node('ShaderNodeAttribute')
+            attribute_node.attribute_name = color_attr_name
+            material.set_principled_shader_value('Base Color', attribute_node.outputs['Color'])
+    else:
+        material.set_principled_shader_value('Base Color', [*color, 1])
+    return material
+
+
+def modify_material(obj: MeshObjectUtility.MeshObject,
+                    color: Tuple[float, float, float] | Literal['pale_blue'] | str = COLORS['pale_blue'],
+                    roughness: float = 0.9):
+    material = set_color(obj=obj, color=color)
+    material.set_principled_shader_value('Roughness', roughness)
+
+
+def load_and_init_backdrop(obj: MeshObjectUtility.MeshObject,
+                           shadow: bool = True,
+                           transparent: bool = True):
+    plane = bproc.loader.load_obj('backdrop.ply')[0]
     plane.clear_materials()
     plane.set_shading_mode('SMOOTH')
-    plane.set_location([0, 0, obj.get_bound_box()[:, 2].min()])
+    plane.set_location([0, 0, 0.3 + obj.get_bound_box()[:, 2].min()])  # Fixme: 0.45 is hardcoded
     if transparent and shadow:
         plane.blender_obj.is_shadow_catcher = True
 
 
-def make_mesh(mesh: trimesh.Trimesh,
-              set_material: bool = True,
-              shade: Literal['flat', 'smooth', 'auto'] = 'flat') -> MeshObjectUtility.MeshObject:
-    obj = MeshObjectUtility.create_with_empty_mesh(object_name='mesh')
-    obj.get_mesh().from_pydata(mesh.vertices, [], mesh.faces)
+def make_obj(mesh_or_pcd: trimesh.Trimesh | trimesh.PointCloud):
+    obj = MeshObjectUtility.create_with_empty_mesh(object_name='pointcloud')
+    obj.get_mesh().from_pydata(mesh_or_pcd.vertices, [], getattr(mesh_or_pcd, 'faces', []))
     obj.get_mesh().validate()
-    if set_material:
-        material = obj.new_material('mesh_material')
-        material.set_principled_shader_value('Roughness', 0.8)
-        material.set_principled_shader_value('Base Color', np.ones(4))
+    return obj
+
+
+def init_mesh(obj: MeshObjectUtility.MeshObject,
+              shade: Literal['flat', 'smooth', 'auto'] = 'flat'):
     if shade == 'auto':
         obj.add_auto_smooth_modifier()
     else:
         obj.set_shading_mode(shade.upper())
-    return obj
 
 
 def _pointcloud_with_geometry_nodes(links,
                                     nodes,
-                                    set_material_node = None,
+                                    set_material_node=None,
                                     point_size: float = 0.004):
     group_input_node = MeshObjectUtility.Utility.get_the_one_node_with_type(nodes, 'NodeGroupInput')
     mesh_to_points_node = nodes.new(type='GeometryNodeMeshToPoints')
@@ -122,7 +217,7 @@ def _pointcloud_with_geometry_nodes(links,
 
 def _pointcloud_with_geometry_nodes_and_instances(links,
                                                   nodes,
-                                                  set_material_node = None,
+                                                  set_material_node=None,
                                                   point_size: float = 0.004):
     group_input_node = MeshObjectUtility.Utility.get_the_one_node_with_type(nodes, 'NodeGroupInput')
     mesh_ico_sphere_node = nodes.new('GeometryNodeMeshUVSphere')
@@ -142,12 +237,10 @@ def _pointcloud_with_geometry_nodes_and_instances(links,
 
 
 def _pointcloud_with_particle_system(obj: MeshObjectUtility.MeshObject,
-                                     material: Optional[MeshObjectUtility.Material] = None,
                                      point_size: float = 0.004):
     sphere = MeshObjectUtility.create_primitive('SPHERE', radius=point_size)
+    sphere.add_material(obj.get_materials()[0])
     sphere.set_shading_mode('SMOOTH')
-    if material is not None:
-        sphere.add_material(material)
     sphere.hide()
 
     obj.add_modifier('PARTICLE_SYSTEM')
@@ -163,23 +256,12 @@ def _pointcloud_with_particle_system(obj: MeshObjectUtility.MeshObject,
     settings.instance_object = sphere.blender_obj
 
 
-def make_pointcloud(points: np.ndarray,
+def init_pointcloud(obj: MeshObjectUtility.MeshObject,
                     point_size: float = 0.004,
-                    set_material: bool = True,
                     use_instance: bool = False,
-                    use_particle_system: bool = False) -> MeshObjectUtility.MeshObject:
-    obj = MeshObjectUtility.create_with_empty_mesh(object_name='pointcloud')
-    obj.get_mesh().from_pydata(points, [], [])
-    obj.get_mesh().validate()
-
-    material = None
-    if set_material:
-        material = obj.new_material('pointcloud_material')
-        material.set_principled_shader_value('Roughness', 0.2)
-        material.set_principled_shader_value('Base Color', [0, 0, 1, 1])
-
+                    use_particle_system: bool = False):
     if use_particle_system:
-        _pointcloud_with_particle_system(obj, material, point_size)
+        _pointcloud_with_particle_system(obj, point_size)
         return obj
 
     node_group = obj.add_geometry_nodes()
@@ -187,25 +269,49 @@ def make_pointcloud(points: np.ndarray,
     nodes = node_group.nodes
 
     set_material_node = None
-    if set_material:
+    if obj.get_materials():
         set_material_node = nodes.new(type='GeometryNodeSetMaterial')
-        set_material_node.inputs['Material'].default_value = material.blender_obj
+        set_material_node.inputs['Material'].default_value = obj.get_materials()[0].blender_obj
 
     if use_instance:
         _pointcloud_with_geometry_nodes_and_instances(links, nodes, set_material_node, point_size)
         return obj
     _pointcloud_with_geometry_nodes(links, nodes, set_material_node, point_size)
-    return obj
 
 
+def add_ambient_occlusion(obj: MeshObjectUtility.MeshObject,
+                          distance: float = 0.5):
+    material = obj.get_materials()[0]
+    ao_node = material.new_node('ShaderNodeAmbientOcclusion')
+    ao_node.inputs['Distance'].default_value = distance
+    ao_node.samples = 8
+    try:
+        attribute_node = material.get_the_one_node_with_type('ShaderNodeAttribute')
+        bsdf_node = material.get_the_one_node_with_type('ShaderNodeBsdfPrincipled')
+        material.insert_node_instead_existing_link(attribute_node.outputs['Color'],
+                                                   ao_node.inputs['Color'],
+                                                   ao_node.outputs['Color'],
+                                                   bsdf_node.inputs['Base Color'])
+    except RuntimeError:
+        ao_node.inputs['Color'].default_value = material.get_principled_shader_value('Base Color')
+        material.set_principled_shader_value('Base Color', ao_node.outputs['Color'])
 
 
-def make_lights(background_light: float = 0.1):
+def make_lights(light_setup: Literal['simple', 'three_point'] = 'simple',
+                shadow: Literal['hard', 'medium', 'soft'] = 'medium',
+                background_light: float = 0.1):
     bproc.renderer.set_world_background([1, 1, 1], strength=background_light)
-    light = bproc.types.Light()
-    light.set_type('POINT')
-    light.set_location([-1, 0, 1])
-    light.set_energy(100)
+    if light_setup == 'simple':
+        light = bproc.types.Light()
+        light.set_type('AREA')
+        light.set_location([0.5, 0, 1.5])
+        light.set_rotation_euler([0, np.deg2rad(20), 0])
+        light.set_scale([1 if shadow == 'soft' else 0.5 if shadow == 'medium' else 0.05] * 3)
+        light.set_energy(50)
+    elif light_setup == 'three_point':
+        raise NotImplementedError("Three point light setup is not implemented.")
+    else:
+        raise ValueError(f"Invalid light setup: {light_setup}")
 
 
 def make_camera(cam_location: np.ndarray,
