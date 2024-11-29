@@ -93,7 +93,7 @@ def run(obj_path: str,
         add_ambient_occlusion(obj=obj,
                               distance=ambient_occlusion or 0.5)
 
-    make_lights(shadow=shadow or ('medium' if isinstance(data, trimesh.Trimesh) else 'soft'),
+    make_lights(shadow=shadow or 'soft',
                 background_light=background_light)
     make_camera(cam_location=cam_location,
                 obj=obj)
@@ -341,7 +341,7 @@ def make_lights(shadow: Literal['hard', 'medium', 'soft'] = 'medium',
     light.set_type('AREA')
     light.set_location([0.5, 0.5, 1.5])
     light.set_rotation_euler([0, np.deg2rad(20), np.deg2rad(45)])
-    light.set_scale([1 if shadow == 'soft' else 0.5 if shadow == 'medium' else 0.05] * 3)
+    light.set_scale([5 if shadow == "very_soft" else 3 if shadow == 'soft' else 0.7 if shadow == 'medium' else 0.05] * 3)
     light.set_energy(50)
 
 
