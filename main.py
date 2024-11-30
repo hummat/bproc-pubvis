@@ -9,6 +9,7 @@ import numpy as np
 import trimesh
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
+from trimesh.path.packing import meshes
 
 COLORS = {'white': (1, 1, 1),
           'black': (0, 0, 0),
@@ -30,15 +31,22 @@ def apply_modifier(obj: MeshObjectUtility.MeshObject, mame: str):
         bpy.ops.object.modifier_apply(modifier=mame)
 
 
+def create_icoshpere(radius: float, subdivisions: int = 1) -> MeshObjectUtility.MeshObject:
+    import bpy
+    bpy.ops.mesh.primitive_ico_sphere_add(radius=radius, subdivisions=subdivisions)
+    return MeshObjectUtility.MeshObject(bpy.context.object)
+
+
 def run(obj_path: str,
         normalize: bool = True,
-        rotate: Optional[Tuple[float, float, float]] = (0, 0, 30),
+        rotate: Optional[Tuple[float, float, float]] = (0, 0, -30),
         shade: Literal['flat', 'smooth', 'auto'] = 'flat',
         set_material: bool = True,
         color: Optional[Tuple[float, float, float] | Literal['pale_blue'] | str] = None,
         roughness: float = 0.9,
         mesh_as_pcd: bool = False,
         point_size: Optional[float] = None,
+        point_shape: Literal['sphere', 'cube', 'diamond'] = 'sphere',
         cam_location: Optional[Tuple[float, float, float]] = None,
         resolution: int | Tuple[int, int] = 512,
         backdrop: bool = True,
@@ -61,7 +69,6 @@ def run(obj_path: str,
 
     data = load_data(obj_path=obj_path,
                      normalize=normalize,
-                     rotate=rotate,
                      mesh_as_pcd=mesh_as_pcd)
     obj = make_obj(mesh_or_pcd=data)
 
@@ -69,7 +76,12 @@ def run(obj_path: str,
         obj.new_material('obj_material')
     modify_material(obj=obj,
                     color=color or ('pale_blue' if isinstance(data, trimesh.Trimesh) else 'pointflow'),
-                    roughness=roughness)
+                    roughness=roughness,
+                    instancer=point_shape != 'sphere')
+
+    if rotate:
+        rotate_obj(obj=obj,
+                   rotate=rotate)
 
     if isinstance(data, trimesh.Trimesh):
         init_mesh(obj=obj,
@@ -77,8 +89,7 @@ def run(obj_path: str,
     elif isinstance(data, trimesh.PointCloud):
         init_pointcloud(obj=obj,
                         point_size=point_size,
-                        use_instance=False,
-                        use_particle_system=False)
+                        point_shape=point_shape)
         if look is None and (color is None or color == 'pointflow'):
             set_output_format(look='Very Low Contrast')
     else:
@@ -93,7 +104,7 @@ def run(obj_path: str,
         add_ambient_occlusion(obj=obj,
                               distance=ambient_occlusion or 0.5)
 
-    make_lights(shadow=shadow or 'soft',
+    make_lights(shadow=shadow or ('medium' if isinstance(data, trimesh.Trimesh) else 'soft'),
                 background_light=background_light)
     make_camera(cam_location=cam_location,
                 obj=obj)
@@ -121,7 +132,6 @@ def init_renderer(resolution: int | Tuple[int, int],
 
 def load_data(obj_path: Path | str,
               normalize: bool = True,
-              rotate: Optional[Tuple[float, float, float]] = None,
               mesh_as_pcd: bool | int = False) -> trimesh.Trimesh | trimesh.PointCloud:
     if obj_path in ['suzanne', 'monkey']:
         obj = MeshObjectUtility.create_primitive('MONKEY')
@@ -142,18 +152,15 @@ def load_data(obj_path: Path | str,
     if normalize:
         mesh.apply_translation(-mesh.bounds.mean(axis=0))
         mesh.apply_scale(1 / mesh.extents.max())
-    if rotate is not None:
-        for i, angle in enumerate(rotate):
-            direction = np.zeros(3)
-            direction[i] = 1
-            mesh.apply_transform(trimesh.transformations.rotation_matrix(np.deg2rad(angle), direction))
+
     if isinstance(mesh, trimesh.Trimesh) and mesh_as_pcd:
         return trimesh.PointCloud(mesh.sample(mesh_as_pcd if mesh_as_pcd > 1 else 2048))
     return mesh
 
 
 def set_color(obj: MeshObjectUtility.MeshObject,
-              color: Tuple[float, float, float] | Literal['pale_blue'] | str) -> MeshObjectUtility.Material:
+              color: Tuple[float, float, float] | Literal['pale_blue'] | str,
+              instancer: bool = False) -> MeshObjectUtility.Material:
     material = obj.get_materials()[0]
     if isinstance(color, str):
         if color in COLORS:
@@ -189,6 +196,8 @@ def set_color(obj: MeshObjectUtility.MeshObject,
 
             attribute_node = material.new_node('ShaderNodeAttribute')
             attribute_node.attribute_name = color_attr_name
+            if instancer:
+                attribute_node.attribute_type = 'INSTANCER'
             material.set_principled_shader_value('Base Color', attribute_node.outputs['Color'])
     else:
         material.set_principled_shader_value('Base Color', [*color, 1])
@@ -197,8 +206,9 @@ def set_color(obj: MeshObjectUtility.MeshObject,
 
 def modify_material(obj: MeshObjectUtility.MeshObject,
                     color: Tuple[float, float, float] | Literal['pale_blue'] | str = COLORS['pale_blue'],
-                    roughness: float = 0.9):
-    material = set_color(obj=obj, color=color)
+                    roughness: float = 0.9,
+                    instancer: bool = False):
+    material = set_color(obj=obj, color=color, instancer=instancer)
     material.set_principled_shader_value('Roughness', roughness)
 
 
@@ -218,6 +228,12 @@ def make_obj(mesh_or_pcd: trimesh.Trimesh | trimesh.PointCloud):
     obj.get_mesh().from_pydata(mesh_or_pcd.vertices, [], getattr(mesh_or_pcd, 'faces', []))
     obj.get_mesh().validate()
     return obj
+
+
+def rotate_obj(obj: MeshObjectUtility.MeshObject,
+               rotate: Tuple[float, float, float]):
+    obj.set_rotation_euler([np.deg2rad(r) for r in rotate])
+    obj.persist_transformation_into_mesh()
 
 
 def init_mesh(obj: MeshObjectUtility.MeshObject,
@@ -248,14 +264,27 @@ def _pointcloud_with_geometry_nodes(links,
 def _pointcloud_with_geometry_nodes_and_instances(links,
                                                   nodes,
                                                   set_material_node=None,
-                                                  point_size: float = 0.004):
+                                                  point_size: float = 0.004,
+                                                  point_shape: Literal['sphere', 'cube', 'diamond'] = 'sphere'):
     group_input_node = MeshObjectUtility.Utility.get_the_one_node_with_type(nodes, 'NodeGroupInput')
-    mesh_ico_sphere_node = nodes.new('GeometryNodeMeshUVSphere')
-    mesh_ico_sphere_node.inputs['Radius'].default_value = point_size
     instance_on_points_node = nodes.new('GeometryNodeInstanceOnPoints')
-    set_shade_smooth_node = nodes.new('GeometryNodeSetShadeSmooth')
-    links.new(mesh_ico_sphere_node.outputs['Mesh'], set_shade_smooth_node.inputs['Geometry'])
-    links.new(set_shade_smooth_node.outputs['Geometry'], instance_on_points_node.inputs['Instance'])
+    if point_shape == 'sphere':
+        mesh_node = nodes.new('GeometryNodeMeshUVSphere')
+        mesh_node.inputs['Radius'].default_value = point_size
+        set_shade_smooth_node = nodes.new('GeometryNodeSetShadeSmooth')
+        links.new(mesh_node.outputs['Mesh'], set_shade_smooth_node.inputs['Geometry'])
+        links.new(set_shade_smooth_node.outputs['Geometry'], instance_on_points_node.inputs['Instance'])
+    elif point_shape == 'cube':
+        mesh_node = nodes.new('GeometryNodeMeshCube')
+        mesh_node.inputs['Size'].default_value = [np.sqrt(2 * point_size ** 2)] * 3
+        links.new(mesh_node.outputs['Mesh'], instance_on_points_node.inputs['Instance'])
+    elif point_shape == 'diamond':
+        mesh_node = nodes.new('GeometryNodeMeshIcoSphere')
+        mesh_node.inputs['Radius'].default_value = point_size
+        mesh_node.inputs['Subdivisions'].default_value = 1
+        links.new(mesh_node.outputs['Mesh'], instance_on_points_node.inputs['Instance'])
+    else:
+        raise ValueError(f"Invalid point shape: {point_shape}")
     links.new(group_input_node.outputs['Geometry'], instance_on_points_node.inputs['Points'])
 
     group_output_node = MeshObjectUtility.Utility.get_the_one_node_with_type(nodes, 'NodeGroupOutput')
@@ -267,11 +296,21 @@ def _pointcloud_with_geometry_nodes_and_instances(links,
 
 
 def _pointcloud_with_particle_system(obj: MeshObjectUtility.MeshObject,
-                                     point_size: float = 0.004):
-    sphere = MeshObjectUtility.create_primitive('SPHERE', radius=point_size)
-    sphere.add_material(obj.get_materials()[0])
-    sphere.set_shading_mode('SMOOTH')
-    sphere.hide()
+                                     point_size: float = 0.004,
+                                     point_shape: Literal['sphere', 'cube', 'diamond'] = 'sphere'):
+    if point_shape == 'sphere':
+        instance = MeshObjectUtility.create_primitive('SPHERE', radius=point_size)
+        instance.set_shading_mode('SMOOTH')
+    elif point_shape == 'cube':
+        instance = MeshObjectUtility.create_primitive('CUBE', size=np.sqrt(2 * point_size ** 2))
+        instance.set_shading_mode('FLAT')
+    elif point_shape == 'diamond':
+        instance = create_icoshpere(radius=point_size)
+        instance.set_shading_mode('FLAT')
+    else:
+        raise ValueError(f"Invalid point shape: {point_shape}")
+    instance.add_material(obj.get_materials()[0])
+    instance.hide()
 
     obj.add_modifier('PARTICLE_SYSTEM')
     settings = obj.blender_obj.modifiers[-1].particle_system.settings
@@ -283,11 +322,12 @@ def _pointcloud_with_particle_system(obj: MeshObjectUtility.MeshObject,
     settings.emit_from = 'VERT'
     settings.use_emit_random = False
     settings.render_type = 'OBJECT'
-    settings.instance_object = sphere.blender_obj
+    settings.instance_object = instance.blender_obj
 
 
 def init_pointcloud(obj: MeshObjectUtility.MeshObject,
                     point_size: Optional[float] = None,
+                    point_shape: Literal['sphere', 'cube', 'diamond'] = 'sphere',
                     use_instance: bool = False,
                     use_particle_system: bool = False):
     if point_size is None:
@@ -295,9 +335,13 @@ def init_pointcloud(obj: MeshObjectUtility.MeshObject,
         distances, _ = KDTree(points).query(points, k=2)
         nearest_neighbor_distances = distances[:, 1]
         point_size = np.median(nearest_neighbor_distances)
+    if point_shape != 'sphere':
+        use_instance = True
 
     if use_particle_system:
-        _pointcloud_with_particle_system(obj, point_size)
+        _pointcloud_with_particle_system(obj=obj,
+                                         point_size=point_size,
+                                         point_shape=point_shape)
         return obj
 
     node_group = obj.add_geometry_nodes()
@@ -310,9 +354,16 @@ def init_pointcloud(obj: MeshObjectUtility.MeshObject,
         set_material_node.inputs['Material'].default_value = obj.get_materials()[0].blender_obj
 
     if use_instance:
-        _pointcloud_with_geometry_nodes_and_instances(links, nodes, set_material_node, point_size)
+        _pointcloud_with_geometry_nodes_and_instances(links=links,
+                                                      nodes=nodes,
+                                                      set_material_node=set_material_node,
+                                                      point_size=point_size,
+                                                      point_shape=point_shape)
         return obj
-    _pointcloud_with_geometry_nodes(links, nodes, set_material_node, point_size)
+    _pointcloud_with_geometry_nodes(links=links,
+                                    nodes=nodes,
+                                    set_material_node=set_material_node,
+                                    point_size=point_size)
 
 
 def add_ambient_occlusion(obj: MeshObjectUtility.MeshObject,
@@ -341,7 +392,16 @@ def make_lights(shadow: Literal['hard', 'medium', 'soft'] = 'medium',
     light.set_type('AREA')
     light.set_location([0.5, 0.5, 1.5])
     light.set_rotation_euler([0, np.deg2rad(20), np.deg2rad(45)])
-    light.set_scale([5 if shadow == "very_soft" else 3 if shadow == 'soft' else 0.7 if shadow == 'medium' else 0.05] * 3)
+    scale = 1
+    if shadow == 'very_hard':
+        scale = 0.01
+    elif shadow == 'hard':
+        scale = 0.1
+    elif shadow == 'soft':
+        scale = 3
+    elif shadow == 'very_soft':
+        scale = 5
+    light.set_scale([scale] * 3)
     light.set_energy(50)
 
 
