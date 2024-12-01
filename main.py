@@ -1,5 +1,6 @@
 import blenderproc as bproc
 from blenderproc.python.types import MeshObjectUtility
+from blenderproc.python.utility.Utility import Utility
 
 from typing import Iterable, Tuple, Literal, Optional
 from pathlib import Path
@@ -55,7 +56,7 @@ def run(obj_path: str,
         transparent: bool = True,
         look: Optional[Literal['Very Low Contrast', 'Medium Contrast', 'Very High Contrast']] = None,
         shadow: Optional[Literal['hard', 'medium', 'soft', 'none']] = None,
-        ambient_occlusion: Optional[float] = None,
+        ambient_occlusion: Optional[bool | float] = None,
         engine: Literal['cycles, eevee'] = 'cycles',
         noise_threshold: float = 0.01,
         samples: int = 100,
@@ -101,8 +102,7 @@ def run(obj_path: str,
                                transparent=transparent)
 
     if ambient_occlusion or isinstance(data, trimesh.Trimesh):
-        add_ambient_occlusion(obj=obj,
-                              distance=ambient_occlusion or 0.5)
+        add_ambient_occlusion(strength=0.5 if isinstance(ambient_occlusion, bool) else ambient_occlusion)
 
     make_lights(shadow=shadow or ('medium' if isinstance(data, trimesh.Trimesh) else 'soft'),
                 background_light=background_light)
@@ -366,22 +366,45 @@ def init_pointcloud(obj: MeshObjectUtility.MeshObject,
                                     point_size=point_size)
 
 
-def add_ambient_occlusion(obj: MeshObjectUtility.MeshObject,
-                          distance: float = 0.5):
-    material = obj.get_materials()[0]
-    ao_node = material.new_node('ShaderNodeAmbientOcclusion')
-    ao_node.inputs['Distance'].default_value = distance
-    ao_node.samples = 8
-    try:
-        attribute_node = material.get_the_one_node_with_type('ShaderNodeAttribute')
-        bsdf_node = material.get_the_one_node_with_type('ShaderNodeBsdfPrincipled')
-        material.insert_node_instead_existing_link(attribute_node.outputs['Color'],
-                                                   ao_node.inputs['Color'],
-                                                   ao_node.outputs['Color'],
-                                                   bsdf_node.inputs['Base Color'])
-    except RuntimeError:
-        ao_node.inputs['Color'].default_value = material.get_principled_shader_value('Base Color')
-        material.set_principled_shader_value('Base Color', ao_node.outputs['Color'])
+def add_ambient_occlusion(obj: Optional[MeshObjectUtility.MeshObject] = None,
+                          distance: float = 0.2,
+                          strength: float = 0.5):
+    if obj is None:
+        import bpy
+
+        bpy.context.scene.view_layers['ViewLayer'].use_pass_ambient_occlusion = True
+        bpy.context.scene.world.light_settings.distance = distance
+        bpy.context.scene.use_nodes = True
+
+        nodes = bpy.context.scene.node_tree.nodes
+        denoise_node = Utility.get_the_one_node_with_type(nodes, 'CompositorNodeDenoise')
+        render_layers_node = Utility.get_the_one_node_with_type(nodes, 'CompositorNodeRLayers')
+        mix_rgb_node = nodes.new('CompositorNodeMixRGB')
+        mix_rgb_node.blend_type = 'MULTIPLY'
+        mix_rgb_node.inputs[0].default_value = strength
+
+        links = bpy.context.scene.node_tree.links
+        Utility.insert_node_instead_existing_link(links,
+                                                  render_layers_node.outputs['Image'],
+                                                  mix_rgb_node.inputs['Image'],
+                                                  mix_rgb_node.outputs['Image'],
+                                                  denoise_node.inputs['Image'])
+        links.new(render_layers_node.outputs['AO'], mix_rgb_node.inputs[2])
+    else:
+        material = obj.get_materials()[0]
+        ao_node = material.new_node('ShaderNodeAmbientOcclusion')
+        ao_node.inputs['Distance'].default_value = distance * strength
+        ao_node.samples = 8
+        try:
+            attribute_node = material.get_the_one_node_with_type('ShaderNodeAttribute')
+            bsdf_node = material.get_the_one_node_with_type('ShaderNodeBsdfPrincipled')
+            material.insert_node_instead_existing_link(attribute_node.outputs['Color'],
+                                                       ao_node.inputs['Color'],
+                                                       ao_node.outputs['Color'],
+                                                       bsdf_node.inputs['Base Color'])
+        except RuntimeError:
+            ao_node.inputs['Color'].default_value = material.get_principled_shader_value('Base Color')
+            material.set_principled_shader_value('Base Color', ao_node.outputs['Color'])
 
 
 def make_lights(shadow: Literal['hard', 'medium', 'soft'] = 'medium',
