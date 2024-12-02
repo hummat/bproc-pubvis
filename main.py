@@ -2,26 +2,146 @@ import blenderproc as bproc
 from blenderproc.python.types import MeshObjectUtility
 from blenderproc.python.utility.Utility import Utility
 
-from typing import Iterable, Tuple, Literal, Optional
+from typing import Tuple, Literal, Optional
 from pathlib import Path
+from enum import Enum
 import fire
 from PIL import Image
 import numpy as np
 import trimesh
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
-from trimesh.path.packing import meshes
-
-COLORS = {'white': (1, 1, 1),
-          'black': (0, 0, 0),
-          'pale_blue': (0.2, 0.3, 1)}
 
 
-def set_output_format(look: Optional[str] = None,
+class Color(Enum):
+    WHITE = (1, 1, 1)
+    BLACK = (0, 0, 0)
+    PALE_BLUE = (0.2, 0.3, 1)
+
+
+class Strength(Enum):
+    OFF = 0.0
+    WEAK = 0.6
+    MEDIUM = 0.7
+    STRONG = 1.0
+
+
+class Shading(Enum):
+    FLAT = 'flat'
+    SMOOTH = 'smooth'
+    AUTO = 'auto'
+
+
+class Shape(Enum):
+    SPHERE = 'sphere'
+    CUBE = 'cube'
+    DIAMOND = 'diamond'
+
+
+class Look(Enum):
+    VERY_LOW_CONTRAST = 'Very Low Contrast'
+    LOW_CONTRAST = 'Low Contrast'
+    MEDIUM_CONTRAST = 'Medium Contrast'
+    HIGH_CONTRAST = 'High Contrast'
+    VERY_HIGH_CONTRAST = 'Very High Contrast'
+
+
+class Shadow(Enum):
+    VERY_HARD = 'very_hard'
+    HARD = 'hard'
+    MEDIUM = 'medium'
+    SOFT = 'soft'
+    VERY_SOFT = 'very_soft'
+    NONE = 'none'
+
+
+class Engine(Enum):
+    CYCLES = 'cycles'
+    EEVEE = 'eevee'
+
+
+def run(obj_path: str,
+        normalize: bool = True,
+        rotate: Optional[Tuple[float, float, float]] = (0, 0, -30),
+        shade: Shading = Shading.FLAT,
+        set_material: bool = True,
+        color: Optional[Tuple[float, float, float] | Color | str] = None,
+        roughness: float = 0.9,
+        mesh_as_pcd: bool = False,
+        point_size: Optional[float] = None,
+        point_shape: Shape = Shape.SPHERE,
+        cam_location: Optional[Tuple[float, float, float]] = None,
+        resolution: int | Tuple[int, int] = 512,
+        backdrop: bool = True,
+        background_light: float = 0.05,
+        background_color: Optional[Tuple[float, float, float] | Color | str] = None,
+        transparent: bool | float = True,
+        look: Optional[Look] = None,
+        exposure: float = 0,
+        shadow: Optional[Shadow] = None,
+        ao: Optional[bool | float] = None,
+        engine: Engine = Engine.CYCLES,
+        noise_threshold: float = 0.001,
+        samples: int = 200,
+        show: bool = True):
+    init_renderer(resolution=resolution,
+                  transparent=transparent or background_color,
+                  look=look or Look.MEDIUM_CONTRAST,
+                  exposure=exposure,
+                  engine=engine,
+                  noise_threshold=noise_threshold,
+                  samples=samples)
+
+    data = load_data(obj_path=obj_path,
+                     normalize=normalize,
+                     mesh_as_pcd=mesh_as_pcd)
+    obj = make_obj(mesh_or_pcd=data)
+
+    if set_material or not obj.get_materials():
+        obj.new_material('obj_material')
+    modify_material(obj=obj,
+                    color=color or (Color.PALE_BLUE if isinstance(data, trimesh.Trimesh) else 'pointflow'),
+                    roughness=roughness,
+                    instancer=point_shape != point_shape.SPHERE)
+
+    if rotate:
+        rotate_obj(obj=obj,
+                   rotate=rotate)
+
+    if isinstance(data, trimesh.Trimesh):
+        init_mesh(obj=obj,
+                  shade=shade)
+    elif isinstance(data, trimesh.PointCloud):
+        init_pointcloud(obj=obj,
+                        point_size=point_size,
+                        point_shape=point_shape)
+        if look is None and (color is None or color == 'pointflow'):
+            set_output_format(look=Look.VERY_LOW_CONTRAST)
+    else:
+        raise ValueError(f"Invalid object type: {type(data)}")
+
+    if backdrop and not (transparent and shadow == Shadow.NONE):
+        load_and_init_backdrop(obj=obj,
+                               shadow=Strength.OFF if shadow == Shadow.NONE else Strength.MEDIUM,
+                               transparent=0.1 if isinstance(transparent, bool) else transparent)
+
+    if ao is None or isinstance(data, trimesh.Trimesh):
+        add_ambient_occlusion(strength=0.5 if isinstance(ao, bool) or ao is None else ao)
+
+    make_lights(obj=obj,
+                shadow=shadow or (Shadow.MEDIUM if isinstance(data, trimesh.Trimesh) else Shadow.SOFT),
+                background_light=background_light)
+    make_camera(obj=obj,
+                cam_location=cam_location)
+    render(background_color=background_color,
+           show=show)
+
+
+def set_output_format(look: Optional[Look] = None,
                       exposure: Optional[float] = None):
     import bpy
     if look is not None:
-        bpy.context.scene.view_settings.look = look
+        bpy.context.scene.view_settings.look = look.value
     if exposure is not None:
         bpy.context.scene.view_settings.exposure = exposure
 
@@ -38,91 +158,20 @@ def create_icoshpere(radius: float, subdivisions: int = 1) -> MeshObjectUtility.
     return MeshObjectUtility.MeshObject(bpy.context.object)
 
 
-def run(obj_path: str,
-        normalize: bool = True,
-        rotate: Optional[Tuple[float, float, float]] = (0, 0, -30),
-        shade: Literal['flat', 'smooth', 'auto'] = 'flat',
-        set_material: bool = True,
-        color: Optional[Tuple[float, float, float] | Literal['pale_blue'] | str] = None,
-        roughness: float = 0.9,
-        mesh_as_pcd: bool = False,
-        point_size: Optional[float] = None,
-        point_shape: Literal['sphere', 'cube', 'diamond'] = 'sphere',
-        cam_location: Optional[Tuple[float, float, float]] = None,
-        resolution: int | Tuple[int, int] = 512,
-        backdrop: bool = True,
-        background_light: float = 0.5,
-        background_color: Optional[Tuple[float, float, float] | str] = None,
-        transparent: bool = True,
-        look: Optional[Literal['Very Low Contrast', 'Medium Contrast', 'Very High Contrast']] = None,
-        shadow: Optional[Literal['hard', 'medium', 'soft', 'none']] = None,
-        ambient_occlusion: Optional[bool | float] = None,
-        engine: Literal['cycles, eevee'] = 'cycles',
-        noise_threshold: float = 0.01,
-        samples: int = 100,
-        show: bool = True):
-    init_renderer(resolution=resolution,
-                  transparent=transparent or background_color,
-                  look=look or 'Medium Contrast',
-                  engine=engine,
-                  noise_threshold=noise_threshold,
-                  samples=samples)
-
-    data = load_data(obj_path=obj_path,
-                     normalize=normalize,
-                     mesh_as_pcd=mesh_as_pcd)
-    obj = make_obj(mesh_or_pcd=data)
-
-    if set_material or not obj.get_materials():
-        obj.new_material('obj_material')
-    modify_material(obj=obj,
-                    color=color or ('pale_blue' if isinstance(data, trimesh.Trimesh) else 'pointflow'),
-                    roughness=roughness,
-                    instancer=point_shape != 'sphere')
-
-    if rotate:
-        rotate_obj(obj=obj,
-                   rotate=rotate)
-
-    if isinstance(data, trimesh.Trimesh):
-        init_mesh(obj=obj,
-                  shade=shade)
-    elif isinstance(data, trimesh.PointCloud):
-        init_pointcloud(obj=obj,
-                        point_size=point_size,
-                        point_shape=point_shape)
-        if look is None and (color is None or color == 'pointflow'):
-            set_output_format(look='Very Low Contrast')
-    else:
-        raise ValueError(f"Invalid object type: {type(data)}")
-
-    if backdrop and not (transparent and shadow == 'none'):
-        load_and_init_backdrop(obj=obj,
-                               shadow=shadow != 'none',
-                               transparent=transparent)
-
-    if ambient_occlusion or isinstance(data, trimesh.Trimesh):
-        add_ambient_occlusion(strength=0.5 if isinstance(ambient_occlusion, bool) else ambient_occlusion)
-
-    make_lights(shadow=shadow or ('medium' if isinstance(data, trimesh.Trimesh) else 'soft'),
-                background_light=background_light)
-    make_camera(cam_location=cam_location,
-                obj=obj)
-    render(background_color=background_color,
-           show=show)
-
-
 def init_renderer(resolution: int | Tuple[int, int],
                   transparent: bool = True,
-                  look: Literal['Very Low Contrast', 'Medium Contrast', 'Very High Contrast'] = 'Medium Contrast',
-                  engine: Literal['cycles, eevee'] = 'cycles',
-                  noise_threshold: float = 0.01,
-                  samples: int = 100):
+                  look: Look = Look.MEDIUM_CONTRAST,
+                  exposure: float = 0,
+                  engine: Engine = Engine.CYCLES,
+                  noise_threshold: float = 0.001,
+                  samples: int = 200):
     bproc.init()
     bproc.renderer.set_output_format(enable_transparency=transparent,
                                      view_transform='Filmic')
-    set_output_format(look=look)
-    if engine == 'cycles':
+    set_output_format(look=look,
+                      exposure=exposure)
+    if engine == Engine.CYCLES:
+        bproc.renderer.set_denoiser('OPTIX')
         bproc.renderer.set_noise_threshold(noise_threshold)
         bproc.renderer.set_max_amount_of_samples(samples)
     if isinstance(resolution, int):
@@ -159,12 +208,12 @@ def load_data(obj_path: Path | str,
 
 
 def set_color(obj: MeshObjectUtility.MeshObject,
-              color: Tuple[float, float, float] | Literal['pale_blue'] | str,
+              color: Tuple[float, float, float] | Color | str,
               instancer: bool = False) -> MeshObjectUtility.Material:
     material = obj.get_materials()[0]
     if isinstance(color, str):
-        if color in COLORS:
-            material.set_principled_shader_value('Base Color', [*COLORS[color], 1])
+        if hasattr(Color, color.upper()):
+            material.set_principled_shader_value('Base Color', [*Color[color.upper()].value, 1])
         else:
             values = obj.mesh_as_trimesh().vertices
             colors = list()
@@ -200,12 +249,12 @@ def set_color(obj: MeshObjectUtility.MeshObject,
                 attribute_node.attribute_type = 'INSTANCER'
             material.set_principled_shader_value('Base Color', attribute_node.outputs['Color'])
     else:
-        material.set_principled_shader_value('Base Color', [*color, 1])
+        material.set_principled_shader_value('Base Color', [*color.value, 1])
     return material
 
 
 def modify_material(obj: MeshObjectUtility.MeshObject,
-                    color: Tuple[float, float, float] | Literal['pale_blue'] | str = COLORS['pale_blue'],
+                    color: Tuple[float, float, float] | Color | str = Color.PALE_BLUE,
                     roughness: float = 0.9,
                     instancer: bool = False):
     material = set_color(obj=obj, color=color, instancer=instancer)
@@ -213,18 +262,32 @@ def modify_material(obj: MeshObjectUtility.MeshObject,
 
 
 def load_and_init_backdrop(obj: MeshObjectUtility.MeshObject,
-                           shadow: bool = True,
-                           transparent: bool = True):
+                           shadow: Strength = Strength.MEDIUM,
+                           transparent: float = 0.1,
+                           offset: np.ndarray = np.array([0, 0, -0.05])):
     plane = bproc.loader.load_obj('backdrop.ply')[0]
     plane.clear_materials()
+    material = plane.new_material('backdrop_material')
     plane.set_shading_mode('SMOOTH')
-    plane.set_location([0, 0, obj.get_bound_box()[:, 2].min()])  # Fixme: 0.45 is hardcoded
-    if transparent and shadow:
+    plane.set_location(np.array([0, 0, obj.get_bound_box()[:, 2].min()]) + offset)
+    if transparent and shadow != Strength.OFF:
         plane.blender_obj.is_shadow_catcher = True
+        tex_coord_node = material.new_node('ShaderNodeTexCoord')
+        tex_coord_node.object = obj.blender_obj
+        tex_gradient_node = material.new_node('ShaderNodeTexGradient')
+        tex_gradient_node.gradient_type = 'SPHERICAL'
+        material.link(tex_coord_node.outputs['Object'], tex_gradient_node.inputs['Vector'])
+        val_to_rgb_node = material.new_node('ShaderNodeValToRGB')
+        val_to_rgb_node.color_ramp.elements[1].position = transparent
+        material.link(tex_gradient_node.outputs['Color'], val_to_rgb_node.inputs['Fac'])
+        math_node = material.new_node('ShaderNodeMath')
+        math_node.operation = 'MULTIPLY'
+        math_node.inputs[1].default_value = shadow.value
+        material.link(val_to_rgb_node.outputs['Color'], math_node.inputs[0])
+        material.set_principled_shader_value('Alpha', math_node.outputs['Value'])
 
-
-def make_obj(mesh_or_pcd: trimesh.Trimesh | trimesh.PointCloud):
-    obj = MeshObjectUtility.create_with_empty_mesh(object_name='pointcloud')
+def make_obj(mesh_or_pcd: trimesh.Trimesh | trimesh.PointCloud) -> MeshObjectUtility.MeshObject:
+    obj = MeshObjectUtility.create_with_empty_mesh('mesh' if hasattr(mesh_or_pcd, 'faces') else 'pointcloud')
     obj.get_mesh().from_pydata(mesh_or_pcd.vertices, [], getattr(mesh_or_pcd, 'faces', []))
     obj.get_mesh().validate()
     return obj
@@ -237,11 +300,11 @@ def rotate_obj(obj: MeshObjectUtility.MeshObject,
 
 
 def init_mesh(obj: MeshObjectUtility.MeshObject,
-              shade: Literal['flat', 'smooth', 'auto'] = 'flat'):
-    if shade == 'auto':
+              shade: Shading = Shading.FLAT):
+    if shade == Shading.AUTO:
         obj.add_auto_smooth_modifier()
     else:
-        obj.set_shading_mode(shade.upper())
+        obj.set_shading_mode(shade.name.upper())
 
 
 def _pointcloud_with_geometry_nodes(links,
@@ -297,14 +360,14 @@ def _pointcloud_with_geometry_nodes_and_instances(links,
 
 def _pointcloud_with_particle_system(obj: MeshObjectUtility.MeshObject,
                                      point_size: float = 0.004,
-                                     point_shape: Literal['sphere', 'cube', 'diamond'] = 'sphere'):
-    if point_shape == 'sphere':
+                                     point_shape: Shape = Shape.SPHERE):
+    if point_shape == Shape.SPHERE:
         instance = MeshObjectUtility.create_primitive('SPHERE', radius=point_size)
         instance.set_shading_mode('SMOOTH')
-    elif point_shape == 'cube':
+    elif point_shape == Shape.CUBE:
         instance = MeshObjectUtility.create_primitive('CUBE', size=np.sqrt(2 * point_size ** 2))
         instance.set_shading_mode('FLAT')
-    elif point_shape == 'diamond':
+    elif point_shape == Shape.DIAMOND:
         instance = create_icoshpere(radius=point_size)
         instance.set_shading_mode('FLAT')
     else:
@@ -327,7 +390,7 @@ def _pointcloud_with_particle_system(obj: MeshObjectUtility.MeshObject,
 
 def init_pointcloud(obj: MeshObjectUtility.MeshObject,
                     point_size: Optional[float] = None,
-                    point_shape: Literal['sphere', 'cube', 'diamond'] = 'sphere',
+                    point_shape: Shape = Shape.SPHERE,
                     use_instance: bool = False,
                     use_particle_system: bool = False):
     if point_size is None:
@@ -335,7 +398,7 @@ def init_pointcloud(obj: MeshObjectUtility.MeshObject,
         distances, _ = KDTree(points).query(points, k=2)
         nearest_neighbor_distances = distances[:, 1]
         point_size = np.median(nearest_neighbor_distances)
-    if point_shape != 'sphere':
+    if point_shape != Shape.SPHERE:
         use_instance = True
 
     if use_particle_system:
@@ -377,24 +440,33 @@ def add_ambient_occlusion(obj: Optional[MeshObjectUtility.MeshObject] = None,
         bpy.context.scene.use_nodes = True
 
         nodes = bpy.context.scene.node_tree.nodes
-        denoise_node = Utility.get_the_one_node_with_type(nodes, 'CompositorNodeDenoise')
         render_layers_node = Utility.get_the_one_node_with_type(nodes, 'CompositorNodeRLayers')
         mix_rgb_node = nodes.new('CompositorNodeMixRGB')
         mix_rgb_node.blend_type = 'MULTIPLY'
         mix_rgb_node.inputs[0].default_value = strength
 
         links = bpy.context.scene.node_tree.links
-        Utility.insert_node_instead_existing_link(links,
-                                                  render_layers_node.outputs['Image'],
-                                                  mix_rgb_node.inputs['Image'],
-                                                  mix_rgb_node.outputs['Image'],
-                                                  denoise_node.inputs['Image'])
+        try:
+            denoise_node = Utility.get_the_one_node_with_type(nodes, 'CompositorNodeDenoise')
+            Utility.insert_node_instead_existing_link(links,
+                                                      render_layers_node.outputs['Image'],
+                                                      mix_rgb_node.inputs['Image'],
+                                                      mix_rgb_node.outputs['Image'],
+                                                      denoise_node.inputs['Image'])
+        except RuntimeError:
+            composite_node = Utility.get_the_one_node_with_type(nodes, 'CompositorNodeComposite')
+            Utility.insert_node_instead_existing_link(links,
+                                                      render_layers_node.outputs['Image'],
+                                                      mix_rgb_node.inputs['Image'],
+                                                      mix_rgb_node.outputs['Image'],
+                                                      composite_node.inputs['Image'])
         links.new(render_layers_node.outputs['AO'], mix_rgb_node.inputs[2])
     else:
         material = obj.get_materials()[0]
         ao_node = material.new_node('ShaderNodeAmbientOcclusion')
         ao_node.inputs['Distance'].default_value = distance * strength
         ao_node.samples = 8
+        ao_node.only_local = True
         try:
             attribute_node = material.get_the_one_node_with_type('ShaderNodeAttribute')
             bsdf_node = material.get_the_one_node_with_type('ShaderNodeBsdfPrincipled')
@@ -407,37 +479,47 @@ def add_ambient_occlusion(obj: Optional[MeshObjectUtility.MeshObject] = None,
             material.set_principled_shader_value('Base Color', ao_node.outputs['Color'])
 
 
-def make_lights(shadow: Literal['hard', 'medium', 'soft'] = 'medium',
-                background_light: float = 0.5):
+def make_lights(obj: MeshObjectUtility.MeshObject,
+                shadow: Shadow = Shadow.MEDIUM,
+                background_light: float = 0.05):
     bproc.renderer.set_world_background([1, 1, 1], strength=background_light)
 
-    light = bproc.types.Light()
-    light.set_type('AREA')
-    light.set_location([0.5, 0.5, 1.5])
-    light.set_rotation_euler([0, np.deg2rad(20), np.deg2rad(45)])
+    key_light = bproc.types.Light('AREA', name='key_light')
+    key_light.set_location([1, 0.5, 2])
+    key_light.set_rotation_mat(bproc.camera.rotation_from_forward_vec(obj.get_location() - key_light.get_location()))
     scale = 1
-    if shadow == 'very_hard':
+    if shadow == Shadow.VERY_HARD:
         scale = 0.01
-    elif shadow == 'hard':
+    elif shadow == Shadow.HARD:
         scale = 0.1
-    elif shadow == 'soft':
+    elif shadow == Shadow.SOFT:
         scale = 3
-    elif shadow == 'very_soft':
+    elif shadow == Shadow.VERY_SOFT:
         scale = 5
-    light.set_scale([scale] * 3)
-    light.set_energy(50)
+    key_light.set_scale([scale] * 3)
+    key_light.set_energy(50)
+
+    fill_light = bproc.types.Light(name='fill_light')
+    fill_light.set_location([0, -2, 0])
+    fill_light.set_energy(5)
+    fill_light.blender_obj.data.use_shadow = False
+
+    rim_light = bproc.types.Light(name='rim_light')
+    rim_light.set_location([-1, 0, 0.5])
+    rim_light.set_energy(5)
+    rim_light.blender_obj.data.use_shadow = False
 
 
 def make_camera(obj: MeshObjectUtility.MeshObject,
-                cam_location: Optional[Tuple[float, float, float]] = None):
+                cam_location: Optional[Tuple[float, float, float]] = None,
+                offset: np.ndarray = np.array([0, 0.01, 0])):
     if cam_location is None:
         bbox = obj.get_bound_box()
         size = np.array([bbox[:, 0].max() - bbox[:, 0].min(),
                          bbox[:, 1].max() - bbox[:, 1].min(),
                          bbox[:, 2].max() - bbox[:, 2].min()])
         cam_location = [1.6 * size.max(), 0, 2 * bbox[:, 2].max()]
-    poi = bproc.object.compute_poi([obj])
-    rotation_matrix = bproc.camera.rotation_from_forward_vec(poi - cam_location)
+    rotation_matrix = bproc.camera.rotation_from_forward_vec(obj.get_location() + offset - cam_location)
     cam2world_matrix = bproc.math.build_transformation_mat(cam_location, rotation_matrix)
     bproc.camera.add_camera_pose(cam2world_matrix)
 
@@ -448,7 +530,7 @@ def render(background_color: Optional[Tuple[float, float, float] | str] = None,
     image = Image.fromarray(data['colors'][0].astype(np.uint8))
     if background_color:
         if isinstance(background_color, str):
-            background_color = COLORS[background_color]
+            background_color = Color[background_color.upper()].value
         background = Image.new('RGBA', image.size, tuple(c * 255 for c in background_color))
         image = Image.alpha_composite(background, image)
     if show:
