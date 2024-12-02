@@ -16,7 +16,13 @@ from scipy.spatial import KDTree
 class Color(Enum):
     WHITE = (1, 1, 1)
     BLACK = (0, 0, 0)
-    PALE_BLUE = (0.2, 0.3, 1)
+    PALE_VIOLET = (0.342605, 0.313068, 0.496933)
+    PALE_TURQUOISE = (0.239975, 0.426978, 0.533277)
+    PALE_GREEN = (0.165398, 0.558341, 0.416653)
+    BRIGHT_BLUE = (0.0419309, 0.154187, 0.438316)
+    PALE_RED = (0.410603, 0.101933, 0.0683599)
+    BEIGE = (0.496933, 0.472623, 0.331984)
+    WARM_GREY = (0.502887, 0.494328, 0.456411)
 
 
 class Strength(Enum):
@@ -66,14 +72,14 @@ def run(obj_path: str,
         shade: Shading = Shading.FLAT,
         set_material: bool = True,
         color: Optional[Tuple[float, float, float] | Color | str] = None,
-        roughness: float = 0.9,
+        roughness: Optional[float] = None,
         mesh_as_pcd: bool = False,
         point_size: Optional[float] = None,
         point_shape: Shape = Shape.SPHERE,
         cam_location: Optional[Tuple[float, float, float]] = None,
         resolution: int | Tuple[int, int] = 512,
         backdrop: bool = True,
-        background_light: float = 0.05,
+        background_light: float = 0.1,
         background_color: Optional[Tuple[float, float, float] | Color | str] = None,
         transparent: bool | float = True,
         look: Optional[Look] = None,
@@ -100,8 +106,8 @@ def run(obj_path: str,
     if set_material or not obj.get_materials():
         obj.new_material('obj_material')
     modify_material(obj=obj,
-                    color=color or (Color.PALE_BLUE if isinstance(data, trimesh.Trimesh) else 'pointflow'),
-                    roughness=roughness,
+                    color=color or (Color.BRIGHT_BLUE if isinstance(data, trimesh.Trimesh) else 'pointflow'),
+                    roughness=roughness or (0.5 if isinstance(data, trimesh.Trimesh) else 0.9),
                     instancer=point_shape != point_shape.SPHERE)
 
     if rotate:
@@ -123,9 +129,9 @@ def run(obj_path: str,
     if backdrop and not (transparent and shadow == Shadow.NONE):
         load_and_init_backdrop(obj=obj,
                                shadow=Strength.OFF if shadow == Shadow.NONE else Strength.MEDIUM,
-                               transparent=0.1 if isinstance(transparent, bool) else transparent)
+                               transparent=transparent)
 
-    if ao is None or isinstance(data, trimesh.Trimesh):
+    if ao or (ao is None and isinstance(data, trimesh.Trimesh)):
         add_ambient_occlusion(strength=0.5 if isinstance(ao, bool) or ao is None else ao)
 
     make_lights(obj=obj,
@@ -191,8 +197,11 @@ def load_data(obj_path: Path | str,
         mesh.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 0, 1]))
         obj.delete()
     elif Path(obj_path).suffix == '.blend':
-        mesh = bproc.loader.load_blend(obj_path, obj_types='mesh')[0].mesh_as_trimesh()
-        if not mesh.faces:
+        objs = bproc.loader.load_blend(obj_path, obj_types='mesh')
+        mesh = objs[0].mesh_as_trimesh()
+        for obj in objs:
+            obj.delete()
+        if mesh.faces is None:
             mesh = trimesh.PointCloud(mesh.vertices)
     else:
         mesh = trimesh.load(obj_path, force='mesh')
@@ -254,7 +263,7 @@ def set_color(obj: MeshObjectUtility.MeshObject,
 
 
 def modify_material(obj: MeshObjectUtility.MeshObject,
-                    color: Tuple[float, float, float] | Color | str = Color.PALE_BLUE,
+                    color: Tuple[float, float, float] | Color | str = Color.BRIGHT_BLUE,
                     roughness: float = 0.9,
                     instancer: bool = False):
     material = set_color(obj=obj, color=color, instancer=instancer)
@@ -263,7 +272,7 @@ def modify_material(obj: MeshObjectUtility.MeshObject,
 
 def load_and_init_backdrop(obj: MeshObjectUtility.MeshObject,
                            shadow: Strength = Strength.MEDIUM,
-                           transparent: float = 0.1,
+                           transparent: bool | float = True,
                            offset: np.ndarray = np.array([0, 0, -0.05])):
     plane = bproc.loader.load_obj('backdrop.ply')[0]
     plane.clear_materials()
@@ -272,19 +281,21 @@ def load_and_init_backdrop(obj: MeshObjectUtility.MeshObject,
     plane.set_location(np.array([0, 0, obj.get_bound_box()[:, 2].min()]) + offset)
     if transparent and shadow != Strength.OFF:
         plane.blender_obj.is_shadow_catcher = True
-        tex_coord_node = material.new_node('ShaderNodeTexCoord')
-        tex_coord_node.object = obj.blender_obj
-        tex_gradient_node = material.new_node('ShaderNodeTexGradient')
-        tex_gradient_node.gradient_type = 'SPHERICAL'
-        material.link(tex_coord_node.outputs['Object'], tex_gradient_node.inputs['Vector'])
-        val_to_rgb_node = material.new_node('ShaderNodeValToRGB')
-        val_to_rgb_node.color_ramp.elements[1].position = transparent
-        material.link(tex_gradient_node.outputs['Color'], val_to_rgb_node.inputs['Fac'])
-        math_node = material.new_node('ShaderNodeMath')
-        math_node.operation = 'MULTIPLY'
-        math_node.inputs[1].default_value = shadow.value
-        material.link(val_to_rgb_node.outputs['Color'], math_node.inputs[0])
-        material.set_principled_shader_value('Alpha', math_node.outputs['Value'])
+        material.set_principled_shader_value('Alpha', shadow.value)
+        if not isinstance(transparent, bool):
+            tex_coord_node = material.new_node('ShaderNodeTexCoord')
+            tex_coord_node.object = obj.blender_obj
+            tex_gradient_node = material.new_node('ShaderNodeTexGradient')
+            tex_gradient_node.gradient_type = 'SPHERICAL'
+            material.link(tex_coord_node.outputs['Object'], tex_gradient_node.inputs['Vector'])
+            val_to_rgb_node = material.new_node('ShaderNodeValToRGB')
+            val_to_rgb_node.color_ramp.elements[1].position = transparent
+            material.link(tex_gradient_node.outputs['Color'], val_to_rgb_node.inputs['Fac'])
+            math_node = material.new_node('ShaderNodeMath')
+            math_node.operation = 'MULTIPLY'
+            math_node.inputs[1].default_value = shadow.value
+            material.link(val_to_rgb_node.outputs['Color'], math_node.inputs[0])
+            material.set_principled_shader_value('Alpha', math_node.outputs['Value'])
 
 def make_obj(mesh_or_pcd: trimesh.Trimesh | trimesh.PointCloud) -> MeshObjectUtility.MeshObject:
     obj = MeshObjectUtility.create_with_empty_mesh('mesh' if hasattr(mesh_or_pcd, 'faces') else 'pointcloud')
@@ -481,7 +492,7 @@ def add_ambient_occlusion(obj: Optional[MeshObjectUtility.MeshObject] = None,
 
 def make_lights(obj: MeshObjectUtility.MeshObject,
                 shadow: Shadow = Shadow.MEDIUM,
-                background_light: float = 0.05):
+                background_light: float = 0.1):
     bproc.renderer.set_world_background([1, 1, 1], strength=background_light)
 
     key_light = bproc.types.Light('AREA', name='key_light')
@@ -497,16 +508,16 @@ def make_lights(obj: MeshObjectUtility.MeshObject,
     elif shadow == Shadow.VERY_SOFT:
         scale = 5
     key_light.set_scale([scale] * 3)
-    key_light.set_energy(50)
+    key_light.set_energy(150)
 
     fill_light = bproc.types.Light(name='fill_light')
     fill_light.set_location([0, -2, 0])
-    fill_light.set_energy(5)
+    fill_light.set_energy(10)
     fill_light.blender_obj.data.use_shadow = False
 
     rim_light = bproc.types.Light(name='rim_light')
-    rim_light.set_location([-1, 0, 0.5])
-    rim_light.set_energy(5)
+    rim_light.set_location([-1, 0, 0.4])
+    rim_light.set_energy(10)
     rim_light.blender_obj.data.use_shadow = False
 
 
