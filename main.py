@@ -77,15 +77,16 @@ class Primitive(Enum):
 
 
 class Animation(Enum):
-    TURNTABLE = 'turntable'
+    TURN = 'turn'
     SWIVEL = 'swivel'
     TUMBLE = 'tumble'
 
 
 def run(obj_path: str,
         normalize: bool = True,
-        rotate: Optional[Tuple[float, float, float]] = (0, 0, -30),
+        rotate: Optional[Tuple[float, float, float]] = (0, 0, -35),
         gravity: bool = False,
+        animate: Optional[Animation | str] = None,
         shade: Shading | str = Shading.FLAT,
         set_material: bool = True,
         color: Optional[Tuple[float, float, float] | Color | str] = None,
@@ -93,7 +94,8 @@ def run(obj_path: str,
         mesh_as_pcd: bool = False,
         point_size: Optional[float] = None,
         point_shape: Shape | str = Shape.SPHERE,
-        cam_location: Optional[Tuple[float, float, float]] = None,
+        cam_location: Tuple[float, float, float] = (1.5, 0, 1),
+        cam_offset: Tuple[float, float, float] = (0, 0, 0),
         resolution: int | Tuple[int, int] = 512,
         fstop: Optional[float] = None,
         backdrop: bool = True,
@@ -129,7 +131,7 @@ def run(obj_path: str,
         obj.new_material('obj_material')
     modify_material(obj=obj,
                     color=color or (Color.BRIGHT_BLUE if isinstance(data, trimesh.Trimesh) else 'pointflow'),
-                    camera_location=cam_location or get_camera_location(obj=obj),
+                    camera_location=cam_location,
                     roughness=roughness or (0.5 if isinstance(data, trimesh.Trimesh) else 0.9),
                     instancer=Shape(point_shape) is not Shape.SPHERE)
 
@@ -167,12 +169,29 @@ def run(obj_path: str,
     make_lights(obj=obj,
                 shadow=shadow or (Shadow.MEDIUM if isinstance(data, trimesh.Trimesh) else Shadow.SOFT),
                 background_light=bg_light)
-    cam_location = cam_location or (get_camera_location(obj=obj, scale=np.array([1.6, 0, 1.9])) if gravity else None)
     make_camera(obj=obj,
-                cam_location=cam_location,
+                location=cam_location,
+                offset=cam_offset,
                 fstop=fstop)
-    render(background_color=bg_color,
-           show=show)
+    if Animation(animate) is Animation.TURN:
+        images = list()
+        for z in range(0, 360, 10):
+            rotate_obj(obj=obj,
+                       rotate=(0, 0, z))
+            image = render(background_color=bg_color,
+                           show=False)
+            images.append(image)
+        images[0].save(
+            './out.gif',
+            save_all=True,
+            append_images=images[1:],
+            format='GIF',
+            duration=200,
+            loop=1
+        )
+    else:
+        render(background_color=bg_color,
+               show=show)
 
 
 def set_output_format(look: Optional[Look | str] = None,
@@ -577,27 +596,19 @@ def make_lights(obj: MeshObjectUtility.MeshObject,
         rim_light.blender_obj.data.use_shadow = False
 
 
-def get_camera_location(obj: MeshObjectUtility.MeshObject,
-                        scale: np.ndarray = np.array([1.7, 0, 2])) -> np.ndarray:
-    bbox = obj.get_bound_box()
-    size = np.array([bbox[:, 0].max() - bbox[:, 0].min(),
-                     bbox[:, 1].max() - bbox[:, 1].min(),
-                     bbox[:, 2].max() - bbox[:, 2].min()])
-    return np.array([size.max(), 0, bbox[:, 2].max()]) * scale
-
-
 def make_camera(obj: MeshObjectUtility.MeshObject,
-                cam_location: Optional[Tuple[float, float, float] | np.ndarray] = None,
-                offset: np.ndarray = np.array([0, 0, -0.05]),
+                location: Tuple[float, float, float] | np.ndarray = (1.5, 0, 1),
+                offset: Optional[Tuple[float, float, float] | np.ndarray] = None,
                 fstop: Optional[float] = None):
-    if cam_location is None:
-        cam_location = get_camera_location(obj=obj)
-    cam_location = np.array(cam_location)
-    rotation_matrix = bproc.camera.rotation_from_forward_vec(obj.get_location() + offset - cam_location)
-    cam2world_matrix = bproc.math.build_transformation_mat(cam_location, rotation_matrix)
+    if offset is None:
+        offset = [0, 0, 0]
+    location = np.array(location)
+    offset = np.array(offset)
+    rotation_matrix = bproc.camera.rotation_from_forward_vec(obj.get_location() + offset - location)
+    cam2world_matrix = bproc.math.build_transformation_mat(location, rotation_matrix)
     bproc.camera.add_camera_pose(cam2world_matrix)
     if fstop:
-        focal_distance = np.linalg.norm(obj.mesh_as_trimesh().vertices - cam_location, axis=1).min()
+        focal_distance = np.linalg.norm(obj.mesh_as_trimesh().vertices - location, axis=1).min()
         bproc.camera.add_depth_of_field(focal_point_obj=None,
                                         fstop_value=fstop,
                                         focal_distance=focal_distance)
@@ -605,13 +616,14 @@ def make_camera(obj: MeshObjectUtility.MeshObject,
 
 def render(background_color: Optional[Tuple[float, float, float] | Color | str] = None,
            save: Optional[Path | str] = None,
-           show: bool = False):
+           show: bool = False) -> Image:
     data = bproc.renderer.render()
     images = data['colors']
     if len(images) == 1:
-        image = Image.fromarray(data['colors'][0].astype(np.uint8))
+        image = Image.fromarray(images[0].astype(np.uint8))
     else:
-        raise NotImplementedError("Multiple images are not supported yet")
+        for image in images:
+            Image.fromarray(image.astype(np.uint8)).show()
 
     if background_color:
         if isinstance(background_color, str):
@@ -624,6 +636,8 @@ def render(background_color: Optional[Tuple[float, float, float] | Color | str] 
         image.save(save)
     if show:
         image.show()
+
+    return image
 
 
 fire.Fire(run)
