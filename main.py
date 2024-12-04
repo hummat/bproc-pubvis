@@ -1,17 +1,22 @@
 import blenderproc as bproc
 from blenderproc.python.types import MeshObjectUtility
-from blenderproc.python.utility.Utility import Utility
+from blenderproc.python.utility.Utility import Utility, stdout_redirected
+from blenderproc.python.camera import CameraUtility
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 from pathlib import Path
 import random
+import subprocess
 from enum import Enum
 import fire
 from PIL import Image
 import numpy as np
 import trimesh
+from trimesh import Trimesh, PointCloud
 import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
+from loguru import logger
+from tqdm import trange
 
 
 class Color(Enum):
@@ -82,7 +87,16 @@ class Animation(Enum):
     TUMBLE = 'tumble'
 
 
-def run(obj_path: str,
+class Light(Enum):
+    OFF = 0.0
+    VERY_DARK = 0.1
+    DARK = 0.3
+    MEDIUM = 0.5
+    BRIGHT = 0.7
+    VERY_BRIGHT = 1.0
+
+
+def run(obj_path: str | Tuple[str, str],
         normalize: bool = True,
         rotate: Optional[Tuple[float, float, float]] = (0, 0, -35),
         gravity: bool = False,
@@ -99,7 +113,7 @@ def run(obj_path: str,
         resolution: int | Tuple[int, int] = 512,
         fstop: Optional[float] = None,
         backdrop: bool = True,
-        bg_light: float = 0.2,
+        light: Optional[Light | str | float] = None,
         bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
         transparent: bool | float = True,
         look: Optional[Look | str] = None,
@@ -109,7 +123,8 @@ def run(obj_path: str,
         engine: Engine | str = Engine.CYCLES,
         noise_threshold: Optional[float] = None,
         samples: Optional[int] = None,
-        show: bool = True,
+        save: Optional[Path | str] = None,
+        show: bool = False,
         seed: int = 1337):
     random.seed(seed)
     np.random.seed(seed)
@@ -122,75 +137,52 @@ def run(obj_path: str,
                   noise_threshold=noise_threshold or 0.01,
                   samples=samples or 100)
 
-    data = load_data(obj_path=obj_path,
-                     normalize=normalize,
-                     mesh_as_pcd=mesh_as_pcd)
-    obj = make_obj(mesh_or_pcd=data)
-
-    if set_material or not obj.get_materials():
-        obj.new_material('obj_material')
-    modify_material(obj=obj,
-                    color=color or (Color.BRIGHT_BLUE if isinstance(data, trimesh.Trimesh) else 'pointflow'),
-                    camera_location=cam_location,
-                    roughness=roughness or (0.5 if isinstance(data, trimesh.Trimesh) else 0.9),
-                    instancer=Shape(point_shape) is not Shape.SPHERE)
-
-    if rotate:
-        rotate_obj(obj=obj,
-                   rotate=rotate)
-
-    if isinstance(data, trimesh.Trimesh):
-        init_mesh(obj=obj,
-                  shade=shade)
-    elif isinstance(data, trimesh.PointCloud):
-        init_pointcloud(obj=obj,
-                        point_size=point_size,
-                        point_shape=point_shape)
-        if look is None and (color is None or color == 'pointflow'):
-            set_output_format(look=Look.VERY_LOW_CONTRAST)
-    else:
-        raise ValueError(f"Invalid object type: {type(data)}")
+    obj = setup_obj(obj_path=obj_path,
+                    normalize=normalize,
+                    mesh_as_pcd=mesh_as_pcd,
+                    set_material=set_material,
+                    color=color,
+                    cam_location=cam_location,
+                    roughness=roughness,
+                    point_shape=point_shape,
+                    rotate=rotate,
+                    shade=shade,
+                    point_size=point_size,
+                    look=look)
+    is_mesh = len(obj.get_mesh().polygons) > 0
+    if gravity and not is_mesh:
+        logger.warning("Disabling gravity for point clouds.")
+        gravity = False
 
     if gravity or (backdrop and not (transparent and shadow and Shadow(shadow) is Shadow.NONE)):
         shadow_strength = Strength.OFF if shadow and Shadow(shadow) is Shadow.NONE else Strength.MEDIUM
-        plane = load_and_init_backdrop(obj=obj,
-                                       shadow_strength=shadow_strength,
-                                       transparent=transparent)
-        if gravity:
-            obj.enable_rigidbody(active=True)
-            plane.enable_rigidbody(active=False, collision_shape='MESH')
-            bproc.object.simulate_physics_and_fix_final_poses(min_simulation_time=4,
-                                                              max_simulation_time=20,
-                                                              check_object_interval=1)
+        setup_backdrop(obj=obj,
+                       shadow_strength=shadow_strength,
+                       transparent=transparent,
+                       gravity=gravity)
 
-    if ao or (ao is None and isinstance(data, trimesh.Trimesh)):
+    if ao or (ao is None and is_mesh):
         add_ambient_occlusion(strength=0.5 if isinstance(ao, bool) or ao is None else ao)
 
+    light = light or (Light.BRIGHT if is_mesh else Light.VERY_BRIGHT)
+    light = light if isinstance(light, float) else Light[light.upper()].value if isinstance(light, str) else light.value
     make_lights(obj=obj,
-                shadow=shadow or (Shadow.MEDIUM if isinstance(data, trimesh.Trimesh) else Shadow.SOFT),
-                background_light=bg_light)
+                shadow=shadow or (Shadow.MEDIUM if is_mesh else Shadow.SOFT),
+                light_intensity=light)
     make_camera(obj=obj,
                 location=cam_location,
                 offset=cam_offset,
                 fstop=fstop)
-    if Animation(animate) is Animation.TURN:
-        images = list()
-        for z in range(0, 360, 10):
-            rotate_obj(obj=obj,
-                       rotate=(0, 0, z))
-            image = render(background_color=bg_color,
-                           show=False)
-            images.append(image)
-        images[0].save(
-            './out.gif',
-            save_all=True,
-            append_images=images[1:],
-            format='GIF',
-            duration=200,
-            loop=1
-        )
+
+    show = show or save is None
+    if animate:
+        make_animation(obj=obj,
+                       save=Path(Animation(animate).value).with_suffix('.gif') if save is None else Path(save),
+                       animation=Animation(animate),
+                       background_color=bg_color)
     else:
         render(background_color=bg_color,
+               save=None if save is None else Path(save),
                show=show)
 
 
@@ -216,12 +208,12 @@ def create_icoshpere(radius: float, subdivisions: int = 1) -> MeshObjectUtility.
 
 
 def init_renderer(resolution: int | Tuple[int, int],
-                  transparent: bool = True,
-                  look: Look | str = Look.MEDIUM_CONTRAST,
-                  exposure: float = 0,
-                  engine: Engine | str = Engine.CYCLES,
-                  noise_threshold: float = 0.01,
-                  samples: int = 100):
+                  transparent: bool,
+                  look: Look | str,
+                  exposure: float,
+                  engine: Engine | str,
+                  noise_threshold: float,
+                  samples: int):
     bproc.init()
     bproc.renderer.set_output_format(enable_transparency=transparent,
                                      view_transform='Filmic')
@@ -236,9 +228,86 @@ def init_renderer(resolution: int | Tuple[int, int],
     bproc.camera.set_resolution(*resolution)
 
 
-def load_data(obj_path: Path | str | Primitive,
+def setup_obj(obj_path: str | Tuple[str, str],
+              normalize: bool,
+              mesh_as_pcd: bool,
+              set_material: bool,
+              color: Optional[Tuple[float, float, float] | Color | str],
+              cam_location: Tuple[float, float, float],
+              roughness: Optional[float],
+              point_shape: Shape | str,
+              rotate: Optional[Tuple[float, float, float]],
+              shade: Shading | str,
+              point_size: Optional[float],
+              look: Optional[Look | str]) -> MeshObjectUtility.MeshObject:
+    data = load_data(obj_path=obj_path,
+                     normalize=normalize,
+                     mesh_as_pcd=mesh_as_pcd)
+    if isinstance(data, tuple):
+        color = [color, 'cool']
+    else:
+        data = [data]
+        color = [color]
+
+    objs = list()
+    for d, c in zip(data, color):
+        obj = make_obj(mesh_or_pcd=d)
+        is_mesh = len(obj.get_mesh().polygons) > 0
+
+        if set_material or not obj.get_materials():
+            obj.new_material(f"{'mesh' if is_mesh else 'pointcloud'}_material")
+        modify_material(obj=obj,
+                        color=c or (Color.PALE_GREEN if is_mesh else 'pointflow'),
+                        camera_location=cam_location,
+                        roughness=roughness or (0.5 if is_mesh else 0.9),
+                        instancer=Shape(point_shape) is not Shape.SPHERE)
+
+        if is_mesh:
+            init_mesh(obj=obj,
+                      shade=shade)
+        else:
+            init_pointcloud(obj=obj,
+                            point_size=point_size,
+                            point_shape=point_shape)
+            if look is None and (c is None or c == 'pointflow'):
+                set_output_format(look=Look.VERY_LOW_CONTRAST)
+
+        objs.append(obj)
+
+    mesh = objs[0]
+    if len(objs) > 1:
+        pcd = objs[1]
+        pcd.set_parent(mesh)
+
+    if rotate:
+        rotate_obj(obj=mesh,
+                   rotate=rotate,
+                   persistent=True)
+
+    return mesh
+
+
+def load_data(obj_path: str | Tuple[str, str] | Primitive,
               normalize: bool = True,
-              mesh_as_pcd: bool | int = False) -> trimesh.Trimesh | trimesh.PointCloud:
+              mesh_as_pcd: bool | int = False) -> Trimesh | PointCloud | Tuple[Trimesh, PointCloud]:
+    if not isinstance(obj_path, (str, Primitive)):
+        obj_1 = trimesh.load(obj_path[0], force='mesh')
+        obj_2 = trimesh.load(obj_path[1], force='mesh')
+        if obj_1.faces is None:
+            pcd = PointCloud(obj_1.vertices)
+            mesh = Trimesh(obj_2.vertices, obj_2.faces)
+        else:
+            pcd = PointCloud(obj_2.vertices)
+            mesh = Trimesh(obj_1.vertices, obj_1.faces)
+        if normalize:
+            offset = -mesh.bounds.mean(axis=0)
+            scale = 1 / mesh.extents.max()
+            mesh.apply_translation(offset)
+            mesh.apply_scale(scale)
+            pcd.apply_translation(offset)
+            pcd.apply_scale(scale)
+        return mesh, pcd
+
     if hasattr(Primitive, obj_path.upper()):
         if Primitive(obj_path) in [Primitive.SUZANNE, Primitive.MONKEY]:
             obj = MeshObjectUtility.create_primitive('MONKEY')
@@ -260,17 +329,17 @@ def load_data(obj_path: Path | str | Primitive,
         for obj in objs:
             obj.delete()
         if mesh.faces is None:
-            mesh = trimesh.PointCloud(mesh.vertices)
+            mesh = PointCloud(mesh.vertices)
     else:
         mesh = trimesh.load(obj_path, force='mesh')
-    if not isinstance(mesh, (trimesh.Trimesh, trimesh.PointCloud)):
+    if not isinstance(mesh, (Trimesh, PointCloud)):
         raise TypeError(f"Invalid object type: {type(mesh)}")
     if normalize:
         mesh.apply_translation(-mesh.bounds.mean(axis=0))
         mesh.apply_scale(1 / mesh.extents.max())
 
-    if isinstance(mesh, trimesh.Trimesh) and mesh_as_pcd:
-        return trimesh.PointCloud(mesh.sample(mesh_as_pcd if mesh_as_pcd > 1 else 4096))
+    if isinstance(mesh, Trimesh) and mesh_as_pcd:
+        return PointCloud(mesh.sample(mesh_as_pcd if mesh_as_pcd > 1 else 4096))
     return mesh
 
 
@@ -337,10 +406,11 @@ def modify_material(obj: MeshObjectUtility.MeshObject,
     material.set_principled_shader_value('Roughness', roughness)
 
 
-def load_and_init_backdrop(obj: MeshObjectUtility.MeshObject,
-                           shadow_strength: Strength | str = Strength.MEDIUM,
-                           transparent: bool | float = True,
-                           offset: np.ndarray = np.array([0, 0, -0.05])) -> MeshObjectUtility.MeshObject:
+def setup_backdrop(obj: MeshObjectUtility.MeshObject,
+                   shadow_strength: Strength | str = Strength.MEDIUM,
+                   transparent: bool | float = True,
+                   gravity: bool = False,
+                   offset: np.ndarray = np.array([0, 0, -0.05])):
     plane = bproc.loader.load_obj('backdrop.ply')[0]
     plane.clear_materials()
     material = plane.new_material('backdrop_material')
@@ -365,20 +435,29 @@ def load_and_init_backdrop(obj: MeshObjectUtility.MeshObject,
             math_node.inputs[1].default_value = shadow_strength.value
             material.link(val_to_rgb_node.outputs['Color'], math_node.inputs[0])
             material.set_principled_shader_value('Alpha', math_node.outputs['Value'])
-    return plane
+    if gravity:
+        obj.enable_rigidbody(active=True)
+        plane.enable_rigidbody(active=False, collision_shape='MESH')
+        bproc.object.simulate_physics_and_fix_final_poses(min_simulation_time=4,
+                                                          max_simulation_time=20,
+                                                          check_object_interval=1)
 
 
-def make_obj(mesh_or_pcd: trimesh.Trimesh | trimesh.PointCloud) -> MeshObjectUtility.MeshObject:
+def make_obj(mesh_or_pcd: Trimesh | PointCloud) -> MeshObjectUtility.MeshObject:
     obj = MeshObjectUtility.create_with_empty_mesh('mesh' if hasattr(mesh_or_pcd, 'faces') else 'pointcloud')
     obj.get_mesh().from_pydata(mesh_or_pcd.vertices, [], getattr(mesh_or_pcd, 'faces', []))
     obj.get_mesh().validate()
+    obj.persist_transformation_into_mesh()
     return obj
 
 
 def rotate_obj(obj: MeshObjectUtility.MeshObject,
-               rotate: Tuple[float, float, float]):
-    obj.set_rotation_euler([np.deg2rad(r) for r in rotate])
-    obj.persist_transformation_into_mesh()
+               rotate: Tuple[float, float, float],
+               frame: Optional[int] = None,
+               persistent: bool = False):
+    obj.set_rotation_euler(rotation_euler=[np.deg2rad(r) for r in rotate], frame=frame)
+    if persistent:
+        obj.persist_transformation_into_mesh()
 
 
 def init_mesh(obj: MeshObjectUtility.MeshObject,
@@ -563,10 +642,10 @@ def add_ambient_occlusion(obj: Optional[MeshObjectUtility.MeshObject] = None,
 
 def make_lights(obj: MeshObjectUtility.MeshObject,
                 shadow: Shadow | str = Shadow.MEDIUM,
-                background_light: float = 0.2,
+                light_intensity: float = 0.2,
                 fill_light: bool = False,
                 rim_light: bool = False):
-    bproc.renderer.set_world_background([1, 1, 1], strength=background_light)
+    bproc.renderer.set_world_background([1, 1, 1], strength=0.15 * light_intensity)
 
     key_light = bproc.types.Light('AREA', name='key_light')
     key_light.set_location([1, 0.5, 2])
@@ -581,18 +660,18 @@ def make_lights(obj: MeshObjectUtility.MeshObject,
     elif Shadow(shadow) is Shadow.VERY_SOFT:
         scale = 5
     key_light.set_scale([scale] * 3)
-    key_light.set_energy(150)
+    key_light.set_energy(int(150 * light_intensity))
 
     if fill_light:
         fill_light = bproc.types.Light(name='fill_light')
         fill_light.set_location([0, -2, 0])
-        fill_light.set_energy(10)
+        fill_light.set_energy(int(10 * light_intensity))
         fill_light.blender_obj.data.use_shadow = False
 
     if rim_light:
         rim_light = bproc.types.Light(name='rim_light')
         rim_light.set_location([-1, 0, 0.4])
-        rim_light.set_energy(10)
+        rim_light.set_energy(int(10 * light_intensity))
         rim_light.blender_obj.data.use_shadow = False
 
 
@@ -614,30 +693,86 @@ def make_camera(obj: MeshObjectUtility.MeshObject,
                                         focal_distance=focal_distance)
 
 
+def create_mp4_with_ffmpeg(image_folder: Path, output_path: Path, fps: int = 20) -> None:
+    image_files: List[Path] = sorted(image_folder.glob('*.png'))  # Adjust the pattern as needed
+    if not image_files:
+        raise ValueError("No images found in the specified folder.")
+
+    ffmpeg_command = [
+        'ffmpeg',
+        '-framerate', str(fps),
+        '-i', str(image_folder / 'image_%04d.png'),
+        '-c:v', 'libx264',
+        '-pix_fmt', 'yuv420p',
+        str(output_path)
+    ]
+
+    subprocess.run(ffmpeg_command, check=True)
+
+
+def make_animation(obj: MeshObjectUtility.MeshObject,
+                   animation: Animation,
+                   frames: int = 18,
+                   fps: int = 20,
+                   save: Optional[Path] = Path('animation.gif'),
+                   background_color: Optional[Tuple[float, float, float] | Color | str] = None):
+    if animation is Animation.TURN:
+        cam_pose = CameraUtility.get_camera_pose()
+        for frame, angle in enumerate(np.linspace(0, 360 - 360 // frames, frames)):
+            rotate_obj(obj=obj,
+                       rotate=(0, 0, -angle),
+                       frame=frame)
+            CameraUtility.add_camera_pose(cam_pose, frame=frame)
+
+    images = render(background_color=background_color)
+    save = Path(save).resolve()
+    images[0].save(save.with_suffix('.png'))
+
+    if save.suffix == '.gif':
+        images[0].save(save,
+                       save_all=True,
+                       append_images=images[1:],
+                       format='GIF',
+                       duration=1000 // fps,
+                       loop=0)
+    elif save.suffix == '.mp4':
+        image_folder = save.parent / 'images'
+        image_folder.mkdir(exist_ok=True)
+        for i, image in enumerate(images):
+            image.save(image_folder / f'image_{i:04d}.png')
+        create_mp4_with_ffmpeg(image_folder=image_folder, output_path=save, fps=fps)
+        for image in image_folder.glob('*.png'):
+            image.unlink()
+        image_folder.rmdir()
+
+
 def render(background_color: Optional[Tuple[float, float, float] | Color | str] = None,
-           save: Optional[Path | str] = None,
-           show: bool = False) -> Image:
-    data = bproc.renderer.render()
-    images = data['colors']
-    if len(images) == 1:
-        image = Image.fromarray(images[0].astype(np.uint8))
-    else:
-        for image in images:
-            Image.fromarray(image.astype(np.uint8)).show()
-
-    if background_color:
+           save: Optional[Path] = None,
+           show: bool = False,
+           progress: bool = True) -> List[Image]:
+    if background_color is not None:
         if isinstance(background_color, str):
-            background_color = Color[background_color.upper()]
+            background_color = (np.array(Color[background_color.upper()].value) + 0.3).clip(0, 1)
         background_color = background_color.value if isinstance(background_color, Color) else background_color
-        background = Image.new('RGBA', image.size, tuple(int(c * 255) for c in background_color))
-        image = Image.alpha_composite(background, image)
 
-    if save:
-        image.save(save)
-    if show:
-        image.show()
+    with stdout_redirected(enabled=not progress):
+        data = bproc.renderer.render()
 
-    return image
+    images: List[Image] = list()
+    images_np: List[np.ndarray] = data['colors']
+    for i, image_np in enumerate(images_np):
+        image = Image.fromarray(image_np.astype(np.uint8))
+
+        if background_color is not None:
+            background = Image.new('RGBA', image.size, tuple(int(c * 255) for c in background_color))
+            image = Image.alpha_composite(background, image)
+
+        if save:
+            image.save(save.parent / f'{save.stem}_{i:04d}{save.suffix}')
+        if show:
+            image.show()
+        images.append(image)
+    return images
 
 
 fire.Fire(run)
