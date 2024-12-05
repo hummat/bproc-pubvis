@@ -1,0 +1,7 @@
+[build-system]
+requires = ["setuptools>=75.6.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bproc-pubvis"
+version = "0.1.0"
