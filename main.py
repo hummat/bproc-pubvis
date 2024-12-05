@@ -123,9 +123,55 @@ def run(obj_path: str | Tuple[str, str],
         samples: Optional[int] = None,
         save: Optional[Path | str] = None,
         show: bool = False,
+        export: Optional[Path | str] = None,
         verbose: bool = False,
         debug: bool = False,
         seed: int = 1337):
+    """Creates and renders publication-ready visualizations of 3D meshes and point clouds.
+
+    This function serves as the main entry point for the bproc-pubvis library, handling
+    the complete pipeline from loading 3D objects to final rendering. It supports both
+    static renders and animations, with extensive customization options for materials,
+    lighting, camera positioning, and rendering quality.
+
+    Args:
+        obj_path: Path to the 3D object file or tuple containing path and object name
+        normalize: Whether to normalize the object scale
+        rotate: Initial rotation angles (x, y, z) in degrees
+        gravity: Whether to enable physics-based gravity simulation
+        animate: Animation type to apply (turn, tumble) or False for static render
+        shade: Shading style to apply to the object
+        set_material: Whether to apply default materials
+        color: Color for the object in RGB format
+        roughness: Material roughness value
+        mesh_as_pcd: Treat mesh vertices as point cloud
+        point_size: Size of points when rendering point clouds
+        point_shape: Shape to use for point cloud visualization
+        cam_location: Camera position in 3D space
+        cam_offset: Additional offset applied to camera position
+        resolution: Output resolution (single int for square, tuple for rectangular)
+        fstop: Camera f-stop value for depth of field
+        backdrop: Whether to include a backdrop plane
+        light: Lighting intensity preset or custom value
+        bg_color: Background color in RGB format
+        transparent: Whether to render with transparency
+        look: Visual style preset to apply
+        exposure: Global exposure adjustment
+        shadow: Shadow type and intensity
+        ao: Ambient occlusion strength or disable
+        engine: Rendering engine to use
+        noise_threshold: Cycles render noise threshold
+        samples: Number of render samples
+        save: Output file path for rendered image
+        show: Whether to display the render
+        export: Output file path for OBJ file export
+        verbose: Enable verbose logging
+        debug: Enable debug mode
+        seed: Random seed for reproducibility
+
+    Returns:
+        None. Output is saved to file if save path is provided, and/or displayed if show is True.
+    """
     random.seed(seed)
     np.random.seed(seed)
     logger.remove()
@@ -203,10 +249,46 @@ def run(obj_path: str | Tuple[str, str],
                save=None if save is None else Path(save),
                show=show)
 
+    if export:
+        export_obj(obj=obj,
+                   path=Path(export).resolve())
+
+
+def export_obj(obj: bproc.types.MeshObject,
+               path: Path):
+    """Exports a BlenderProc mesh object to an OBJ or GLTF file.
+
+    This function exports the given BlenderProc mesh object to an OBJ or GLTF file
+    at the specified path. The export format is determined based on the file extension.
+
+    Args:
+        obj: The BlenderProc mesh object to export.
+        path: The file path to export the object to.
+    """
+    import bpy
+    for o in bproc.object.get_all_mesh_objects():
+        o.deselect()
+    obj.select()
+    if path.suffix == '.obj':
+        bpy.ops.wm.obj_export(filepath=str(path),
+                              export_selected_objects=True)
+    elif path.suffix in ['.glb', '.gltf']:
+        bpy.ops.export_scene.gltf(filepath=str(path),
+                                  use_selection=True)
+    else:
+        logger.warning(f"Unsupported export format: {path.suffix}")
+
 
 def set_output_format(look: Optional[Look | str] = None,
                       exposure: Optional[float] = None,
                       gamma: Optional[float] = None):
+    """Sets the output format for the Blender scene.
+
+    Args:
+        look: The look to apply to the scene view settings.
+        exposure: The exposure value to set for the scene view settings.
+        gamma: The gamma value to set for the scene view settings.
+    """
     import bpy
     if look is not None:
         bpy.context.scene.view_settings.look = Look(look).value
@@ -216,37 +298,96 @@ def set_output_format(look: Optional[Look | str] = None,
         bpy.context.scene.view_settings.gamma = gamma
 
 
-def apply_modifier(obj: bproc.types.MeshObject, mame: str):
+def apply_modifier(obj: bproc.types.MeshObject, name: str):
+    """Applies a specified modifier to a given Blender object.
+
+    This function permanently applies a modifier to the mesh geometry. The modifier
+    must already be added to the object before calling this function.
+
+    Args:
+        obj: The Blender object to which the modifier will be applied.
+        name: The name of the modifier to apply.
+    """
     import bpy
     with bpy.context.temp_override(object=obj.blender_obj):
-        bpy.ops.object.modifier_apply(modifier=mame)
+        bpy.ops.object.modifier_apply(modifier=name)
 
 
 def create_icoshpere(radius: float, subdivisions: int = 1) -> bproc.types.MeshObject:
+    """Creates an icosphere mesh object in Blender.
+
+    An icosphere is a spherical mesh made of triangular faces. It's often used
+    for point cloud visualization and as a base for more complex geometries.
+    Higher subdivision levels create smoother spheres but increase vertex count.
+
+    Args:
+        radius: The radius of the icosphere in Blender units
+        subdivisions: The number of subdivisions (0-5). Higher values create smoother spheres.
+
+    Returns:
+        bproc.types.MeshObject: The created icosphere mesh object
+    """
     import bpy
     bpy.ops.mesh.primitive_ico_sphere_add(radius=radius, subdivisions=subdivisions)
     return bproc.types.MeshObject(bpy.context.object)
 
 
 def get_camera() -> bproc.types.Entity:
+    """Retrieves the active camera in the current Blender scene.
+
+    This function returns the currently active camera used for rendering.
+    If multiple cameras exist in the scene, only the active one is returned.
+
+    Returns:
+        bproc.types.Entity: The active camera entity in the Blender scene.
+    """
     import bpy
     return bproc.types.Entity(bpy.context.scene.camera)
 
 
 def get_all_blender_light_objects() -> List["bpy.types.Object"]:
+    """Retrieves all light objects in the current Blender scene.
+
+    Returns:
+        List[bpy.types.Object]: A list of Blender light objects.
+    """
     import bpy
     return [obj for obj in bpy.context.scene.objects if obj.type == 'LIGHT']
 
 
 def convert_to_lights(blender_objects: List["bpy.types.Object"]) -> List[bproc.types.Light]:
+    """Converts a list of Blender light objects to a list of BlenderProc light objects.
+
+    Args:
+        blender_objects: A list of Blender light objects.
+
+    Returns:
+        A list of BlenderProc light objects.
+    """
     return [bproc.types.Light(blender_obj=obj) for obj in blender_objects]
 
 
 def get_all_light_objects() -> List[bproc.types.Light]:
+    """Retrieves all light objects in the current Blender scene and converts them to BlenderProc light objects.
+
+    Returns:
+        List of BlenderProc light objects.
+    """
     return convert_to_lights(get_all_blender_light_objects())
 
 
 def bake_physics(frames_to_bake: int, gravity: bool = True):
+    """Bakes the physics simulation for a specified number of frames.
+
+    This function sets up the physics simulation environment in Blender,
+    including enabling or disabling gravity, and bakes the simulation
+    for the given number of frames. It also frees the bake cache after
+    the simulation is complete.
+
+    Args:
+        frames_to_bake: The number of frames to bake the physics simulation.
+        gravity: A boolean indicating whether to enable gravity in the simulation.
+    """
     import bpy
 
     bpy.context.scene.use_gravity = gravity
@@ -265,6 +406,22 @@ def init_renderer(resolution: int | Tuple[int, int],
                   engine: Engine | str,
                   noise_threshold: float,
                   samples: int):
+    """Initializes the BlenderProc renderer with the specified settings.
+
+    This function sets up the renderer with the given resolution, transparency,
+    look, exposure, rendering engine, noise threshold, and sample count. It
+    configures the output format, denoiser, and camera resolution based on the
+    provided parameters.
+
+    Args:
+        resolution: The resolution of the output image.
+        transparent: Whether to enable transparency in the output.
+        look: The look to apply to the scene view settings.
+        exposure: The exposure value for the scene.
+        engine: The rendering engine to use (e.g., Cycles, Eevee).
+        noise_threshold: The noise threshold for the denoiser.
+        samples: The maximum number of samples for rendering.
+    """
     bproc.init()
     bproc.renderer.set_output_format(enable_transparency=transparent,
                                      view_transform='Filmic')
@@ -291,6 +448,29 @@ def setup_obj(obj_path: str | Tuple[str, str],
               shade: Shading | str = Shading.FLAT,
               point_size: Optional[float] = None,
               look: Optional[Look | str] = None) -> bproc.types.MeshObject:
+    """Sets up a 3D object in BlenderProc.
+
+    This function loads and processes 3D object data from various sources, applies materials,
+    and initializes the object as either a mesh or a point cloud. It also handles object
+    transformations such as rotation and shading.
+
+    Args:
+        obj_path: Path to the object file or a tuple of paths.
+        normalize: Whether to normalize the object.
+        mesh_as_pcd: Whether to treat the mesh as a point cloud.
+        set_material: Whether to set a material for the object.
+        color: The color to apply to the object.
+        cam_location: The location of the camera.
+        roughness: The roughness value for the material.
+        point_shape: The shape of the points if the object is a point cloud.
+        rotate: The rotation to apply to the object.
+        shade: The shading mode to apply to the object.
+        point_size: The size of the points if the object is a point cloud.
+        look: The look to apply to the scene view settings.
+
+    Returns:
+        The created and configured BlenderProc mesh object.
+    """
     data = load_data(obj_path=obj_path,
                      normalize=normalize,
                      mesh_as_pcd=mesh_as_pcd)
@@ -340,6 +520,19 @@ def setup_obj(obj_path: str | Tuple[str, str],
 def load_data(obj_path: str | Tuple[str, str] | Primitive,
               normalize: bool = True,
               mesh_as_pcd: bool | int = False) -> Trimesh | PointCloud | Tuple[Trimesh, PointCloud]:
+    """Loads and processes 3D object data from various sources.
+
+    This function can load 3D object data from a file path, a tuple of file paths, or a predefined primitive.
+    It supports normalizing the object and converting meshes to point clouds if specified.
+
+    Args:
+        obj_path: Path to the object file, a tuple of paths, or a predefined primitive.
+        normalize: Whether to normalize the object.
+        mesh_as_pcd: Whether to treat the mesh as a point cloud.
+
+    Returns:
+        A Trimesh, PointCloud, or a tuple of Trimesh and PointCloud, depending on the input and options.
+    """
     if not isinstance(obj_path, (str, Primitive)):
         obj_1 = trimesh.load(obj_path[0], force='mesh')
         obj_2 = trimesh.load(obj_path[1], force='mesh')
@@ -394,6 +587,29 @@ def load_data(obj_path: str | Tuple[str, str] | Primitive,
 
 
 def get_color(color: Optional[Tuple[float, float, float] | Color | str]) -> Tuple[float, float, float]:
+    """Returns the RGB color value based on the input.
+
+    This function converts various color input formats into a standardized RGB tuple.
+    Supports direct RGB values, Color enum values, and special string formats.
+    Args:
+        color: The color specification, which can be:
+            - None: Returns white (1,1,1)
+            - Tuple[float,float,float]: Direct RGB values between 0 and 1
+            - Color: Enum value from the Color class
+            - str: Either a Color enum name (e.g., "WHITE") or special values:
+                  "random": Returns random RGB values
+                  "random_color": Returns a random predefined Color enum value
+    Returns:
+        Tuple[float,float,float]: RGB color values between 0 and 1
+
+    Examples:
+        >>> get_color(None)
+        (1.0, 1.0, 1.0)
+        >>> get_color(Color.WHITE)
+        (1.0, 1.0, 1.0)
+        >>> get_color("WHITE")
+        (1.0, 1.0, 1.0)
+    """
     if color is None:
         return Color.WHITE.value
     if isinstance(color, str):
@@ -412,6 +628,18 @@ def set_color(obj: bproc.types.MeshObject,
               color: Tuple[float, float, float] | Color | str,
               camera_location: Tuple[float, float, float] | np.ndarray,
               instancer: bool = False):
+    """Sets the color of a BlenderProc mesh object.
+
+    This function sets the color of a given BlenderProc mesh object. If the color is specified as a string and matches
+    a colormap or 'pointflow', it calculates vertex colors based on the object's vertices and the camera location.
+    Otherwise, it sets the object's base color directly.
+
+    Args:
+        obj: The BlenderProc mesh object to set the color for.
+        color: The color to apply to the object. Can be an RGB tuple, a Color enum, or a string.
+        camera_location: The location of the camera, used for calculating vertex colors if applicable.
+        instancer: A boolean indicating whether to use the 'INSTANCER' attribute type for the color node.
+    """
     material = obj.get_materials()[0]
     if isinstance(color, str) and color in plt.colormaps() + ['pointflow']:
         values = obj.mesh_as_trimesh().vertices
@@ -457,6 +685,20 @@ def setup_backdrop(obj: bproc.types.MeshObject,
                    color: Optional[Tuple[float, float, float] | Color | str] = None,
                    gravity: bool = False,
                    offset: np.ndarray = np.array([0, 0, -0.05])):
+    """Sets up a backdrop for the given object in the Blender scene.
+
+    This function loads a backdrop object, applies materials and shading, and positions it relative to the given object.
+    It also configures transparency and shadow settings for the backdrop. If gravity is enabled, the function sets up
+    rigid body physics for the object and the backdrop and simulates the physics to fix their final poses.
+
+    Args:
+        obj: The BlenderProc mesh object for which the backdrop is being set up.
+        shadow_strength: The strength of the shadow to be applied to the backdrop.
+        transparent: Whether the backdrop should be transparent.
+        color: The color to apply to the backdrop.
+        gravity: Whether to enable gravity for the object and the backdrop.
+        offset: The offset to apply to the backdrop's position.
+    """
     plane = bproc.loader.load_obj('backdrop.ply')[0]
     plane.clear_materials()
     material = plane.new_material('backdrop_material')
@@ -490,6 +732,18 @@ def setup_backdrop(obj: bproc.types.MeshObject,
 
 
 def make_obj(mesh_or_pcd: Trimesh | PointCloud) -> bproc.types.MeshObject:
+    """Creates a BlenderProc mesh object from a Trimesh or PointCloud.
+
+    This function initializes a BlenderProc mesh object with the provided
+    Trimesh or PointCloud data. It sets up the mesh data, validates it,
+    and persists the transformation into the mesh.
+
+    Args:
+        mesh_or_pcd: The Trimesh or PointCloud data to create the mesh object from.
+
+    Returns:
+        The created BlenderProc mesh object.
+    """
     obj = bproc.object.create_with_empty_mesh('mesh' if hasattr(mesh_or_pcd, 'faces') else 'pointcloud')
     obj.get_mesh().from_pydata(mesh_or_pcd.vertices, [], getattr(mesh_or_pcd, 'faces', []))
     obj.get_mesh().validate()
@@ -501,6 +755,17 @@ def rotate_obj(obj: bproc.types.MeshObject,
                rotate: Tuple[float, float, float],
                frame: Optional[int] = None,
                persistent: bool = False):
+    """Rotates a BlenderProc mesh object.
+
+    This function sets the rotation of the given BlenderProc mesh object to the specified Euler angles.
+    If the `persistent` flag is set to True, the transformation is persisted into the mesh data.
+
+    Args:
+        obj: The BlenderProc mesh object to rotate.
+        rotate: A tuple of three floats representing the rotation angles in degrees for the X, Y, and Z axes.
+        frame: The frame number at which to set the rotation. If None, the rotation is applied immediately.
+        persistent: If True, the transformation is persisted into the mesh data.
+    """
     obj.set_rotation_euler(rotation_euler=[np.deg2rad(r) for r in rotate], frame=frame)
     if persistent:
         obj.persist_transformation_into_mesh()
@@ -508,6 +773,16 @@ def rotate_obj(obj: bproc.types.MeshObject,
 
 def init_mesh(obj: bproc.types.MeshObject,
               shade: Shading | str = Shading.FLAT):
+    """Initializes the shading mode for a BlenderProc mesh object.
+
+    This function sets the shading mode of the given BlenderProc mesh object based on the specified shading type.
+    If the shading type is set to 'AUTO', an auto-smooth modifier is added to the object. Otherwise, the shading
+    mode is set to the specified shading type.
+
+    Args:
+        obj: The BlenderProc mesh object to initialize.
+        shade: The shading type to apply to the object. Can be 'FLAT', 'SMOOTH', or 'AUTO'.
+    """
     if Shading(shade) is Shading.AUTO:
         obj.add_auto_smooth_modifier()
     else:
@@ -518,6 +793,17 @@ def _pointcloud_with_geometry_nodes(links,
                                     nodes,
                                     set_material_node=None,
                                     point_size: float = 0.004):
+    """Sets up a point cloud using geometry nodes.
+
+    This function configures a point cloud in Blender using geometry nodes. It converts a mesh to points
+    and optionally sets a material for the points.
+
+    Args:
+        links: The links between geometry nodes.
+        nodes: The geometry nodes to be used.
+        set_material_node: An optional node to set the material for the points.
+        point_size: The size of the points in the point cloud.
+    """
     group_input_node = Utility.get_the_one_node_with_type(nodes, 'NodeGroupInput')
     mesh_to_points_node = nodes.new(type='GeometryNodeMeshToPoints')
     mesh_to_points_node.inputs['Radius'].default_value = point_size
@@ -536,6 +822,18 @@ def _pointcloud_with_geometry_nodes_and_instances(links,
                                                   set_material_node=None,
                                                   point_size: float = 0.004,
                                                   point_shape: Shape | str = Shape.SPHERE):
+    """Sets up a point cloud using geometry nodes and instances.
+
+    This function configures a point cloud in Blender using geometry nodes and instances. It converts a mesh to points
+    and optionally sets a material for the points. The shape of the points can be specified as a sphere, cube, or diamond.
+
+    Args:
+        links: The links between geometry nodes.
+        nodes: The geometry nodes to be used.
+        set_material_node: An optional node to set the material for the points.
+        point_size: The size of the points in the point cloud.
+        point_shape: The shape of the points in the point cloud.
+    """
     group_input_node = Utility.get_the_one_node_with_type(nodes, 'NodeGroupInput')
     instance_on_points_node = nodes.new('GeometryNodeInstanceOnPoints')
     if Shape(point_shape) is Shape.SPHERE:
@@ -568,6 +866,17 @@ def _pointcloud_with_geometry_nodes_and_instances(links,
 def _pointcloud_with_particle_system(obj: bproc.types.MeshObject,
                                      point_size: float = 0.004,
                                      point_shape: Shape | str = Shape.SPHERE):
+    """Sets up a point cloud using a particle system.
+
+    This function configures a point cloud in Blender using a particle system. It creates an instance
+    of the specified shape (sphere, cube, or diamond) and sets up the particle system to emit from
+    the vertices of the given object.
+
+    Args:
+        obj: The BlenderProc mesh object to which the particle system will be applied.
+        point_size: The size of the points in the point cloud.
+        point_shape: The shape of the points in the point cloud.
+    """
     if Shape(point_shape) is Shape.SPHERE:
         instance = bproc.object.create_primitive('SPHERE', radius=point_size)
         instance.set_shading_mode('SMOOTH')
@@ -600,6 +909,18 @@ def init_pointcloud(obj: bproc.types.MeshObject,
                     point_shape: Optional[Shape | str] = None,
                     use_instance: bool = False,
                     use_particle_system: bool = False):
+    """Initializes a point cloud in BlenderProc.
+
+    This function sets up a point cloud for a given BlenderProc mesh object. It estimates the point size if not provided,
+    and configures the point cloud using either geometry nodes, instances, or a particle system based on the specified options.
+
+    Args:
+        obj: The BlenderProc mesh object to initialize as a point cloud.
+        point_size: The size of the points in the point cloud. If None, it is estimated based on the nearest neighbor distance.
+        point_shape: The shape of the points in the point cloud. If specified, instances are used.
+        use_instance: Whether to use instances for the point cloud.
+        use_particle_system: Whether to use a particle system for the point cloud.
+    """
     if point_size is None:
         logger.debug("Estimating point size based on nearest neighbor distance")
         points = obj.mesh_as_trimesh().vertices
@@ -644,6 +965,17 @@ def init_pointcloud(obj: bproc.types.MeshObject,
 def add_ambient_occlusion(obj: Optional[bproc.types.MeshObject] = None,
                           distance: float = 0.2,
                           strength: float = 0.5):
+    """Adds ambient occlusion to the Blender scene or a specific object.
+
+    If no object is provided, it configures the scene to use ambient occlusion
+    with the specified distance and strength. If an object is provided, it adds
+    an ambient occlusion shader node to the object's material.
+
+    Args:
+        obj: The BlenderProc mesh object to which ambient occlusion will be applied.
+        distance: The distance for the ambient occlusion effect.
+        strength: The strength of the ambient occlusion effect.
+    """
     if obj is None:
         import bpy
 
@@ -696,6 +1028,18 @@ def make_lights(obj: bproc.types.MeshObject,
                 light_intensity: float = 0.2,
                 fill_light: bool = False,
                 rim_light: bool = False):
+    """Sets up lighting for the given object in the Blender scene.
+
+    This function configures the lighting environment for a Blender scene, including the key light, fill light, and rim light.
+    It sets the world background, positions the lights, and adjusts their properties based on the provided parameters.
+
+    Args:
+        obj: The BlenderProc mesh object for which the lighting is being set up.
+        shadow: The type of shadow to apply to the key light.
+        light_intensity: The intensity of the key light.
+        fill_light: Whether to add a fill light to the scene.
+        rim_light: Whether to add a rim light to the scene.
+    """
     bproc.renderer.set_world_background([1, 1, 1], strength=0.15 * light_intensity)
 
     key_light = bproc.types.Light('AREA', name='key_light')
@@ -730,6 +1074,15 @@ def make_camera(obj: bproc.types.MeshObject,
                 location: Tuple[float, float, float] | np.ndarray = (1.5, 0, 1),
                 offset: Optional[Tuple[float, float, float] | np.ndarray] = None,
                 fstop: Optional[float] = None):
+    """Sets up the camera in the Blender scene.
+
+    Args:
+        obj: The BlenderProc mesh object to focus the camera on.
+        location: The location of the camera in the scene.
+        offset: The offset to apply to the camera's position.
+        fstop: The f-stop value for depth of field.
+
+    """
     if offset is None:
         offset = [0, 0, 0]
     location = np.array(location)
@@ -744,8 +1097,18 @@ def make_camera(obj: bproc.types.MeshObject,
                                         focal_distance=focal_distance)
 
 
-def create_mp4_with_ffmpeg(image_folder: Path, output_path: Path, fps: int = 20) -> None:
-    image_files: List[Path] = sorted(image_folder.glob('*.png'))  # Adjust the pattern as needed
+def create_mp4_with_ffmpeg(image_folder: Path, output_path: Path, fps: int = 20):
+    """Creates an MP4 video from a sequence of images using FFmpeg.
+
+    This function takes a folder containing image files, sorts them, and uses FFmpeg to create an MP4 video
+    with the specified frames per second (fps). The resulting video is saved to the specified output path.
+
+    Args:
+        image_folder: The folder containing the image files.
+        output_path: The path where the output MP4 video will be saved.
+        fps: The frames per second for the output video.
+    """
+    image_files: List[Path] = sorted(image_folder.glob('*.png'))
     if not image_files:
         raise ValueError("No images found in the specified folder.")
 
@@ -768,6 +1131,21 @@ def make_animation(obj: bproc.types.MeshObject,
                    save: Optional[Path] = Path('animation.gif'),
                    bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
                    debug: bool = False):
+    """Creates an animation of the given object.
+
+    This function sets up and renders an animation for the specified object using BlenderProc.
+    It supports different types of animations such as turning, swiveling, and tumbling.
+    The animation can be saved as a GIF or MP4 file, and various rendering options can be configured.
+
+    Args:
+        obj: The BlenderProc mesh object to animate.
+        animation: The type of animation to perform.
+        frames: The number of frames in the animation.
+        fps: The frames per second for the animation.
+        save: The path where the animation will be saved.
+        bg_color: The background color for the animation.
+        debug: If True, the function runs in debug mode without rendering the final animation.
+    """
     bproc.utility.set_keyframe_render_interval(frame_end=frames)
     if animation in [Animation.TURN, Animation.SWIVEL]:
         pivot = obj
@@ -821,6 +1199,20 @@ def render(bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
            save: Optional[Path] = None,
            show: bool = False,
            progress: bool = True) -> List[Image]:
+    """Renders the scene and returns a list of images.
+
+    This function renders the current BlenderProc scene and returns a list of images.
+    It supports optional background color, saving the images to disk or displaying the images.
+
+    Args:
+        bg_color: Optional background color for the images.
+        save: Optional path to save the rendered images.
+        show: Whether to display the rendered images.
+        progress: Whether to show the rendering progress.
+
+    Returns:
+        A list of rendered images.
+    """
     with stdout_redirected(enabled=not progress):
         data = bproc.renderer.render()
 

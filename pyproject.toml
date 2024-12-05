@@ -1,7 +1,30 @@
 [build-system]
-requires = ["setuptools>=75.6.0", "wheel"]
+requires = ["setuptools>=75.6.0", "wheel>=0.45.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "bproc-pubvis"
 version = "0.1.0"
+description = "Publication-ready visualization of 3D objects and point clouds in seconds."
+authors = [
+    {name = "Matthias Humt", email = "github.gizzard320@passmail.net"},
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+
+dependencies = [
+    "blenderproc>=2.8.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/hummat/bproc-pubvis"
+Repository = "https://github.com/hummat/bproc-pubvis.git"
+"Bug Tracker" = "https://github.com/hummat/bproc-pubvis/issues"
