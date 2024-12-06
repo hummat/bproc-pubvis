@@ -3,7 +3,7 @@ Publication-ready visualization of 3D objects and point clouds in seconds.
 
 | Mesh                            | Point Cloud                   | Mesh + Depth                           |
 |---------------------------------|-------------------------------|----------------------------------------|
-| ![mesh](examples/mesh_0000.png) | ![pcd](examples/pcd_0000.png) | ![mesh_depth](examples/mesh_depth.png) |
+| ![mesh](examples/mesh.png) | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh.png) |
 
 _Head over to the repository's [**GitHub** Pages site](https://hummat.com/bproc-pubvis) for a prettier and more
 interactive version of this README!_
