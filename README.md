@@ -33,10 +33,10 @@ The following options can be added to:
 You can test you render settings using any of the `Blender` primitives (`monkey`, `cube`, `sphere`, `cone`, 
 `cylinder`, ...) as the first argument.
 
-| Mesh                       | Point cloud              | Depth                            |
-|----------------------------|--------------------------|----------------------------------|
-| ![mesh](examples/mesh.png) | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh.png) |
-| `--obj_path suzanne`       | `--pcd`                  | `--pcd --depth`                  |
+| Mesh                                     | Point cloud              | Depth                            |
+|------------------------------------------|--------------------------|----------------------------------|
+| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh.png) |
+| `--obj_path suzanne` (or just `suzanne`) | `--pcd`                  | `--pcd --depth`                  |
 
 ## Basic Options
 
@@ -61,7 +61,7 @@ changed using the `--bg_color` option.
 | Mesh                             | Point cloud                    | Background                           |
 |----------------------------------|--------------------------------|--------------------------------------|
 | ![mesh](examples/mesh_color.png) | ![pcd](examples/pcd_color.png) | ![mesh_depth](examples/bg_color.png) |
-| `--color bright_blue`            | `--pcd --color viridis`        | `--bg_color pale_turquoise`          |
+| `--color bright_blue`            | `--pcd --color plasma`         | `--bg_color pale_turquoise`          |
 
 ### Background
 
@@ -91,7 +91,7 @@ Shadows are rendered by default. To disable them, use the `--noshadow` option. T
 | Soft shadow                       | Hard shadow                      | No shadow                            |
 |-----------------------------------|----------------------------------|--------------------------------------|
 | ![mesh](examples/shadow_soft.png) | ![pcd](examples/shadow_hard.png) | ![mesh_depth](examples/noshadow.png) |
-| `--shadow soft`                   | `--shadow hard`                  | `--noshadow` `--light dark`          |
+| `--shadow soft`                   | `--shadow hard`                  | `--noshadow` `--light medium`        |
 
 ### Shading
 
@@ -101,6 +101,16 @@ The default shading is `flat` for meshes and `smooth` for point clouds. To chang
 |------------------------------|----------------------------------|
 | ![mesh](examples/smooth.png) | ![pcd](examples/auto-smooth.png) |
 | `--shade smooth`             | `--shade auto`                   |
+
+### Gravity
+
+Objects hover slightly above the ground by default. To change this, use the `--gravity` option to run quick physics
+simulation to let the object fall to the ground before rendering.
+
+| Default                    | With gravity                      |
+|----------------------------|-----------------------------------|
+| ![mesh](examples/mesh.png) | ![pcd](examples/gravity.png)      |
+|                            | `--gravity`                       |
 
 ### Animations
 
@@ -112,14 +122,26 @@ To create an animation, use the `--animate` option. The `--frames` option can be
 | ![mesh](examples/turn.gif) | ![pcd](examples/tumble.gif) |
 | `--animate`                | `--animate tubmle`          |
 
+### Interactive 3D Visualization
+
+To provide an interactive 3D visualization, use `--export /path/to/mesh.glb` to export the object as a `.glb` file and
+use
+```html
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<model-viewer src="/path/to/mesh.glb" camera-controls tone-mapping="neutral" shadow-intensity="1" auto-rotate></model-viewer>
+```
+in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.com/bproc-pubvis)) of this repository).
+
 ### Further Options
 
 Some additional useful options include:
 
-* `--roughness`: Change the roughness of the object. Meshes use `0.5` and point clouds use `0.9` by default.
-* `--ao`: Apply ambient occlusion
+* `--roughness`: Change the roughness of the object. Meshes use `0.5` and point clouds `0.9` by default.
+* `--ao`: Apply ambient occlusion (_on_ for meshes, _off_ for point clouds by default)
 * `--fstop`: Enable depth of field with a given f-stop
 * `--keep_material`: Keep your custom material (only works for `.blend` files)
+* `--point_size`: Change the size of the points in the point cloud
+* `--point_shape`: Change the shape of the points in the point cloud (`sphere`, `cube`, `diamond`)
 * `--verbose`: Enable verbose logging during execution
 * `--seed`: Set a seed for the random number generator. Useful for random colors or the tumble animation.
 
