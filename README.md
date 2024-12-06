@@ -139,7 +139,7 @@ use
 ```
 
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
-<model-viewer src="examples/suzanne.glb" camera-controls tone-mapping="neutral" shadow-intensity="1" auto-rotate></model-viewer>
+<model-viewer src="examples/suzanne.glb" camera-controls tone-mapping="neutral" shadow-intensity="1" auto-rotate style="width: 512"></model-viewer>
 
 ### Further Options
 
