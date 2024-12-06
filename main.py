@@ -20,6 +20,9 @@ from loguru import logger
 class Color(Enum):
     WHITE = (1, 1, 1)
     BLACK = (0, 0, 0)
+    RED = (1, 0, 0)
+    GREEN = (0, 1, 0)
+    BLUE = (0, 0, 1)
     PALE_VIOLET = (0.342605, 0.313068, 0.496933)
     PALE_TURQUOISE = (0.239975, 0.426978, 0.533277)
     PALE_GREEN = (0.165398, 0.558341, 0.416653)
@@ -62,7 +65,6 @@ class Shadow(Enum):
     MEDIUM = 'medium'
     SOFT = 'soft'
     VERY_SOFT = 'very_soft'
-    NONE = 'none'
 
 
 class Engine(Enum):
@@ -100,10 +102,10 @@ def run(obj_path: str | Tuple[str, str],
         gravity: bool = False,
         animate: Optional[Animation | str | bool] = None,
         shade: Shading | str = Shading.FLAT,
-        set_material: bool = True,
+        keep_material: bool = False,
         color: Optional[Tuple[float, float, float] | Color | str] = None,
         roughness: Optional[float] = None,
-        mesh_as_pcd: bool = False,
+        pcd: bool = False,
         point_size: Optional[float] = None,
         point_shape: Shape | str = Shape.SPHERE,
         cam_location: Tuple[float, float, float] = (1.5, 0, 1),
@@ -116,7 +118,7 @@ def run(obj_path: str | Tuple[str, str],
         transparent: bool | float = True,
         look: Optional[Look | str] = None,
         exposure: float = 0,
-        shadow: Optional[Shadow | str] = None,
+        shadow: Optional[Shadow | str | bool] = None,
         ao: Optional[bool | float] = None,
         engine: Engine | str = Engine.CYCLES,
         noise_threshold: Optional[float] = None,
@@ -141,10 +143,10 @@ def run(obj_path: str | Tuple[str, str],
         gravity: Whether to enable physics-based gravity simulation
         animate: Animation type to apply (turn, tumble) or False for static render
         shade: Shading style to apply to the object
-        set_material: Whether to apply default materials
+        keep_material: Whether to keep the custom material or apply the default one
         color: Color for the object in RGB format
         roughness: Material roughness value
-        mesh_as_pcd: Treat mesh vertices as point cloud
+        pcd: Create a point cloud by sampling points from the surface of the mesh
         point_size: Size of points when rendering point clouds
         point_shape: Shape to use for point cloud visualization
         cam_location: Camera position in 3D space
@@ -187,11 +189,12 @@ def run(obj_path: str | Tuple[str, str],
                   noise_threshold=noise_threshold or 0.01,
                   samples=samples or 100)
 
-    point_shape = Shape.SPHERE if animate and Animation(animate) in [Animation.TURN, Animation.TUMBLE] else point_shape
+    animate = Animation.TURN if isinstance(animate, bool) else Animation(animate) if animate else None
+    point_shape = Shape.SPHERE if animate in [Animation.TURN, Animation.TUMBLE] else point_shape
     obj = setup_obj(obj_path=obj_path,
                     normalize=normalize,
-                    mesh_as_pcd=mesh_as_pcd,
-                    set_material=set_material,
+                    mesh_as_pcd=pcd,
+                    set_material=not keep_material,
                     color=color,
                     cam_location=cam_location,
                     roughness=roughness,
@@ -207,14 +210,15 @@ def run(obj_path: str | Tuple[str, str],
         gravity = False
 
     offset = np.array([0, 0, -0.05])
-    if animate and Animation(animate) is Animation.TUMBLE:
+    if animate is Animation.TUMBLE:
         if gravity:
             logger.warning("Disabling gravity for tumble animation.")
             gravity = False
         offset = np.array([0, 0, -0.6])
 
-    if gravity or (backdrop and not (transparent and shadow and Shadow(shadow) is Shadow.NONE)):
-        shadow_strength = Strength.OFF if shadow and Shadow(shadow) is Shadow.NONE else Strength.MEDIUM
+    no_shadow = isinstance(shadow, bool) and not shadow
+    if gravity or (backdrop and not (transparent and no_shadow)):
+        shadow_strength = Strength.OFF if no_shadow else Strength.MEDIUM
         setup_backdrop(obj=obj,
                        shadow_strength=shadow_strength,
                        transparent=transparent,
@@ -228,7 +232,7 @@ def run(obj_path: str | Tuple[str, str],
     light = light or (Light.BRIGHT if is_mesh else Light.VERY_BRIGHT)
     light = light if isinstance(light, float) else Light[light.upper()].value if isinstance(light, str) else light.value
     make_lights(obj=obj,
-                shadow=shadow or (Shadow.MEDIUM if is_mesh else Shadow.SOFT),
+                shadow=(Shadow.MEDIUM if is_mesh else Shadow.SOFT) if shadow is None or no_shadow else Shadow(shadow),
                 light_intensity=light)
     make_camera(obj=obj,
                 location=cam_location,
@@ -237,7 +241,6 @@ def run(obj_path: str | Tuple[str, str],
 
     show = show or save is None
     if animate:
-        animate = Animation.TURN if isinstance(animate, bool) else Animation(animate)
         save = Path(animate.value).with_suffix('.gif') if save is None else Path(save)
         make_animation(obj=obj,
                        save=save,
@@ -783,10 +786,10 @@ def init_mesh(obj: bproc.types.MeshObject,
         obj: The BlenderProc mesh object to initialize.
         shade: The shading type to apply to the object. Can be 'FLAT', 'SMOOTH', or 'AUTO'.
     """
+    logger.debug(f"Setting shading mode to {Shading(shade).name}")
     if Shading(shade) is Shading.AUTO:
         obj.add_auto_smooth_modifier()
-    else:
-        obj.set_shading_mode(Shading(shade).name)
+    obj.set_shading_mode(Shading(shade).name)
 
 
 def _pointcloud_with_geometry_nodes(links,
@@ -1229,7 +1232,7 @@ def render(bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
             image = Image.alpha_composite(background, image)
 
         if save:
-            image.save(save.parent / f'{save.stem}_{i:04d}{save.suffix}')
+            image.save(Path(save).resolve())
         if show:
             image.show()
         images.append(image)
