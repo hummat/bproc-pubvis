@@ -127,10 +127,19 @@ To create an animation, use the `--animate` option. The `--frames` option can be
 To provide an interactive 3D visualization, use `--export /path/to/mesh.glb` to export the object as a `.glb` file and
 use
 ```html
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
-<model-viewer src="/path/to/mesh.glb" camera-controls tone-mapping="neutral" shadow-intensity="1" auto-rotate></model-viewer>
+<script 
+    type="module" 
+    src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
+</script>
+<model-viewer 
+    src="/path/to/mesh.glb" 
+    camera-controls tone-mapping="neutral" 
+    shadow-intensity="1" 
+    auto-rotate
+    style="width: 512px; height: 512px;">
+</model-viewer>
 ```
-in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.com/bproc-pubvis)) of this repository).
+in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.com/bproc-pubvis)) of this repository) to display the object.
 
 ### Further Options
 
