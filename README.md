@@ -1,7 +1,7 @@
 # BlenderProc Publication Visualization
 Publication-ready visualization of 3D objects and point clouds in seconds.
 
-| Mesh                       | Point Cloud              | Mesh + Depth                     |
+|                            |                          |                                  |
 |----------------------------|--------------------------|----------------------------------|
 | ![mesh](examples/mesh.png) | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh.png) |
 
@@ -131,12 +131,22 @@ use
     type="module" 
     src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
 </script>
+
+<style>
+model-viewer {
+    width: 512px;
+    height: 512px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+</style>
+
 <model-viewer 
     src="/path/to/mesh.glb" 
     camera-controls tone-mapping="neutral" 
     shadow-intensity="1" 
-    auto-rotate
-    style="width: 512px; height: 512px;">
+    auto-rotate>
 </model-viewer>
 ```
 in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.com/bproc-pubvis)) of this repository) to display the object.
