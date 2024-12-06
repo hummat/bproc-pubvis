@@ -1,8 +1,8 @@
 # BlenderProc Publication Visualization
 Publication-ready visualization of 3D objects and point clouds in seconds.
 
-| Mesh                            | Point Cloud                   | Mesh + Depth                           |
-|---------------------------------|-------------------------------|----------------------------------------|
+| Mesh                       | Point Cloud              | Mesh + Depth                     |
+|----------------------------|--------------------------|----------------------------------|
 | ![mesh](examples/mesh.png) | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh.png) |
 
 _Head over to the repository's [**GitHub** Pages site](https://hummat.com/bproc-pubvis) for a prettier and more
@@ -130,6 +130,6 @@ Adding `--debug` will further disable rendering and only setup the scene.
 
 ## Credits
 
-| [**BlenderProc 2**](https://github.com/DLR-RM/BlenderProc)                                                                                     | [**Blender**](https://www.blender.org)                                    |
-|------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
+| [**BlenderProc 2**](https://github.com/DLR-RM/BlenderProc)                                                                                     | [**Blender**](https://www.blender.org)                                                              |
+|------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | <img src="https://user-images.githubusercontent.com/6104887/137109535-275a2aa3-f5fd-4173-9d16-a9a9b86f66e7.gif" alt="blenderproc" width="512"> | <img src="https://download.blender.org/branding/blender_logo_socket.png" alt="blender" widht="512"> | |
