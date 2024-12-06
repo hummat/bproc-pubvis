@@ -1,9 +1,7 @@
-# BlenderProc Publication Visualization
+# [BlenderProc](https://github.com/DLR-RM/BlenderProc) Publication Visualization
 Publication-ready visualization of 3D objects and point clouds in seconds.
 
-|                            |                          |                                  |
-|----------------------------|--------------------------|----------------------------------|
-| ![mesh](examples/mesh.png) | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh.png) |
+![mesh](examples/mesh.png) ![pcd](examples/pcd.png) ![mesh_depth](examples/mesh.png)
 
 _Head over to the repository's [**GitHub** Pages site](https://hummat.com/bproc-pubvis) for a prettier and more
 interactive version of this README!_
