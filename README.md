@@ -132,4 +132,4 @@ Adding `--debug` will further disable rendering and only setup the scene.
 
 | [**BlenderProc 2**](https://github.com/DLR-RM/BlenderProc)                                                                                     | [**Blender**](https://www.blender.org)                                    |
 |------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|
-| <img src="https://user-images.githubusercontent.com/6104887/137109535-275a2aa3-f5fd-4173-9d16-a9a9b86f66e7.gif" alt="blenderproc" widht="512"> | ![blender](https://download.blender.org/branding/blender_logo_socket.png) | |
+| <img src="https://user-images.githubusercontent.com/6104887/137109535-275a2aa3-f5fd-4173-9d16-a9a9b86f66e7.gif" alt="blenderproc" width="512"> | <img src="https://download.blender.org/branding/blender_logo_socket.png" alt="blender" widht="512"> | |
