@@ -33,7 +33,6 @@ class Color(Enum):
 
 
 class Strength(Enum):
-    OFF = 0.0
     WEAK = 0.6
     MEDIUM = 0.7
     STRONG = 1.0
@@ -216,11 +215,9 @@ def run(obj_path: str | Tuple[str, str],
             gravity = False
         offset = np.array([0, 0, -0.6])
 
-    no_shadow = isinstance(shadow, bool) and not shadow
-    if gravity or (backdrop and not (transparent and no_shadow)):
-        shadow_strength = Strength.OFF if no_shadow else Strength.MEDIUM
+    if gravity or backdrop:
         setup_backdrop(obj=obj,
-                       shadow_strength=shadow_strength,
+                       shadow_strength=Strength.MEDIUM,
                        transparent=transparent,
                        color=None if transparent else bg_color,
                        gravity=gravity,
@@ -231,8 +228,9 @@ def run(obj_path: str | Tuple[str, str],
 
     light = light or (Light.BRIGHT if is_mesh else Light.VERY_BRIGHT)
     light = light if isinstance(light, float) else Light[light.upper()].value if isinstance(light, str) else light.value
+    shadow = Shadow(shadow) if shadow else (Shadow.MEDIUM if is_mesh else Shadow.SOFT) if shadow is None else shadow
     make_lights(obj=obj,
-                shadow=(Shadow.MEDIUM if is_mesh else Shadow.SOFT) if shadow is None or no_shadow else Shadow(shadow),
+                shadow=shadow,
                 light_intensity=light)
     make_camera(obj=obj,
                 location=cam_location,
@@ -707,11 +705,11 @@ def setup_backdrop(obj: bproc.types.MeshObject,
     material = plane.new_material('backdrop_material')
     material.set_principled_shader_value('Base Color', [*get_color(color), 1])
     material.set_principled_shader_value('Roughness', 1.0)
+    material.set_principled_shader_value('Alpha', shadow_strength.value)
     plane.set_shading_mode('SMOOTH')
     plane.set_location(np.array([0, 0, obj.get_bound_box()[:, 2].min()]) + offset)
-    if transparent and Strength(shadow_strength) is not Strength.OFF:
+    if transparent:
         plane.blender_obj.is_shadow_catcher = True
-        material.set_principled_shader_value('Alpha', shadow_strength.value)
         if not isinstance(transparent, bool):
             tex_coord_node = material.new_node('ShaderNodeTexCoord')
             tex_coord_node.object = obj.blender_obj
@@ -1027,7 +1025,7 @@ def add_ambient_occlusion(obj: Optional[bproc.types.MeshObject] = None,
 
 
 def make_lights(obj: bproc.types.MeshObject,
-                shadow: Shadow | str = Shadow.MEDIUM,
+                shadow: Shadow | str | bool = Shadow.MEDIUM,
                 light_intensity: float = 0.2,
                 fill_light: bool = False,
                 rim_light: bool = False):
@@ -1049,14 +1047,17 @@ def make_lights(obj: bproc.types.MeshObject,
     key_light.set_location([1, 0.5, 2])
     key_light.set_rotation_mat(bproc.camera.rotation_from_forward_vec(obj.get_location() - key_light.get_location()))
     scale = 1
-    if Shadow(shadow) is Shadow.VERY_HARD:
-        scale = 0.01
-    elif Shadow(shadow) is Shadow.HARD:
-        scale = 0.1
-    elif Shadow(shadow) is Shadow.SOFT:
-        scale = 3
-    elif Shadow(shadow) is Shadow.VERY_SOFT:
-        scale = 5
+    if shadow:
+        if Shadow(shadow) is Shadow.VERY_HARD:
+            scale = 0.01
+        elif Shadow(shadow) is Shadow.HARD:
+            scale = 0.1
+        elif Shadow(shadow) is Shadow.SOFT:
+            scale = 3
+        elif Shadow(shadow) is Shadow.VERY_SOFT:
+            scale = 5
+    else:
+        key_light.blender_obj.data.use_shadow = False
     key_light.set_scale([scale] * 3)
     key_light.set_energy(int(150 * light_intensity))
 
