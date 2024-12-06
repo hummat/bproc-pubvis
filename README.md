@@ -1,9 +1,9 @@
-# BlenderProc Publication Visualization
+# [BlenderProc](https://github.com/DLR-RM/BlenderProc) Publication Visualization
 Publication-ready visualization of 3D objects and point clouds in seconds.
 
-| Mesh                       | Point Cloud              | Mesh + Depth                     |
-|----------------------------|--------------------------|----------------------------------|
-| ![mesh](examples/mesh.png) | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh.png) |
+| Mesh                       | Point Cloud              | Mesh + Depth                           |
+|----------------------------|--------------------------|----------------------------------------|
+| ![mesh](examples/mesh.png) | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh_depth.png) |
 
 ## Installation
 ```bash
@@ -26,22 +26,24 @@ The following options can be added to:
 * **export** the object: `--export path/to/output.obj` (use `.glb` for a web-friendly format)
 * render the mesh as **point cloud**: `--pcd`
 * render the mesh as **depth** image: `--depth`
-* render the mesh as **point cloud** from projected **depth** image: `--pcd --depth`
+* render the mesh as **point cloud** from projected **depth** image: `--pcd` `--depth`
 
 You can test you render settings using any of the `Blender` primitives (`monkey`, `cube`, `sphere`, `cone`, 
 `cylinder`, ...) as the first argument.
 
-| Mesh                                     | Point cloud              | Depth                            |
-|------------------------------------------|--------------------------|----------------------------------|
-| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh.png) |
-| `--obj_path suzanne` (or just `suzanne`) | `--pcd`                  | `--pcd --depth`                  |
+| Mesh                                     | Point cloud              | Depth                                                            |
+|------------------------------------------|--------------------------|------------------------------------------------------------------|
+| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png) | ![mesh_depth](examples/depth.png)                                |
+| `--obj_path suzanne` (or just `suzanne`) | `--pcd`                  | `--pcd 1024` `--point_size 0.01` `--depth` `--color cool` `--ao` |
 
 ## Basic Options
 
 * `--resolution`: Change the resolution of the rendered image (default: `512x512`)
 * `--normalize`: Normalize and center the object to fit into a unit cube (`True` by default)
-* `--rotate`: Rotate the object using `XYZ` Euler angles (default: `0,0,-35`)
+* `--rotate`: Rotate the object using `XYZ` Euler angles in degrees (default: `0,0,-35`)
 * `--show`: Show the rendered image in a window (`True` if `--save` is not provided)
+* `--cam_location`: Set the camera location (default: `1.5,0,1`)
+* `--cam_offset`: By default, the camera looks at the origin (`0,0,0`). Use this option to change the look-at point.
 
 ## Additional Options
 
@@ -59,7 +61,7 @@ changed using the `--bg_color` option.
 | Mesh                             | Point cloud                    | Background                           |
 |----------------------------------|--------------------------------|--------------------------------------|
 | ![mesh](examples/mesh_color.png) | ![pcd](examples/pcd_color.png) | ![mesh_depth](examples/bg_color.png) |
-| `--color bright_blue`            | `--pcd --color plasma`         | `--bg_color pale_turquoise`          |
+| `--color bright_blue`            | `--pcd` `--color plasma`       | `--bg_color pale_turquoise`          |
 
 ### Background
 

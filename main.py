@@ -104,9 +104,11 @@ def run(obj_path: str | Tuple[str, str],
         keep_material: bool = False,
         color: Optional[Tuple[float, float, float] | Color | str] = None,
         roughness: Optional[float] = None,
-        pcd: bool = False,
+        pcd: bool | int = False,
+        depth: bool = False,
+        keep_mesh: bool = False,
         point_size: Optional[float] = None,
-        point_shape: Shape | str = Shape.SPHERE,
+        point_shape: Optional[Shape | str] = None,
         cam_location: Tuple[float, float, float] = (1.5, 0, 1),
         cam_offset: Tuple[float, float, float] = (0, 0, 0),
         resolution: int | Tuple[int, int] = 512,
@@ -146,6 +148,8 @@ def run(obj_path: str | Tuple[str, str],
         color: Color for the object in RGB format
         roughness: Material roughness value
         pcd: Create a point cloud by sampling points from the surface of the mesh
+        depth: Visualize the given mesh as a (projected) depth map
+        keep_mesh: Whether to keep the mesh object after creating the point cloud
         point_size: Size of points when rendering point clouds
         point_shape: Shape to use for point cloud visualization
         cam_location: Camera position in 3D space
@@ -192,9 +196,10 @@ def run(obj_path: str | Tuple[str, str],
     point_shape = Shape.SPHERE if animate in [Animation.TURN, Animation.TUMBLE] else point_shape
     obj = setup_obj(obj_path=obj_path,
                     normalize=normalize,
-                    mesh_as_pcd=pcd,
+                    mesh_as_pcd=pcd and not depth,
+                    keep_mesh=keep_mesh,
                     set_material=not keep_material,
-                    color=color,
+                    color=Color.WARM_GREY if depth else color,
                     cam_location=cam_location,
                     roughness=roughness,
                     point_shape=point_shape,
@@ -202,6 +207,24 @@ def run(obj_path: str | Tuple[str, str],
                     shade=shade,
                     point_size=point_size,
                     look=look)
+
+    make_camera(obj=obj,
+                location=cam_location,
+                offset=cam_offset,
+                fstop=fstop)
+
+    if depth:
+        obj = render_depth(obj=obj,
+                           pcd=pcd,
+                           keep_mesh=keep_mesh,
+                           color=color,
+                           cam_location=cam_location,
+                           roughness=roughness,
+                           point_shape=point_shape,
+                           point_size=point_size,
+                           look=look)
+        if obj is None:
+            return
 
     is_mesh = len(obj.get_mesh().polygons) > 0
     if gravity and not is_mesh:
@@ -232,10 +255,6 @@ def run(obj_path: str | Tuple[str, str],
     make_lights(obj=obj,
                 shadow=shadow,
                 light_intensity=light)
-    make_camera(obj=obj,
-                location=cam_location,
-                offset=cam_offset,
-                fstop=fstop)
 
     show = show or save is None
     if animate:
@@ -346,6 +365,11 @@ def get_camera() -> bproc.types.Entity:
     return bproc.types.Entity(bpy.context.scene.camera)
 
 
+def get_camera_resolution() -> Tuple[int, int]:
+    import bpy
+    return bpy.context.scene.render.resolution_x, bpy.context.scene.render.resolution_y
+
+
 def get_all_blender_light_objects() -> List["bpy.types.Object"]:
     """Retrieves all light objects in the current Blender scene.
 
@@ -439,7 +463,8 @@ def init_renderer(resolution: int | Tuple[int, int],
 
 def setup_obj(obj_path: str | Tuple[str, str],
               normalize: bool = True,
-              mesh_as_pcd: bool = False,
+              mesh_as_pcd: bool | int = False,
+              keep_mesh: bool = False,
               set_material: bool = True,
               color: Optional[Tuple[float, float, float] | Color | str] = None,
               cam_location: Tuple[float, float, float] = (1.5, 0, 1),
@@ -458,7 +483,8 @@ def setup_obj(obj_path: str | Tuple[str, str],
     Args:
         obj_path: Path to the object file or a tuple of paths.
         normalize: Whether to normalize the object.
-        mesh_as_pcd: Whether to treat the mesh as a point cloud.
+        mesh_as_pcd: Whether transform the mesh into a point cloud by sampling points from the surface.
+        keep_mesh: Whether to keep the mesh object after creating the point cloud.
         set_material: Whether to set a material for the object.
         color: The color to apply to the object.
         cam_location: The location of the camera.
@@ -474,7 +500,8 @@ def setup_obj(obj_path: str | Tuple[str, str],
     """
     data = load_data(obj_path=obj_path,
                      normalize=normalize,
-                     mesh_as_pcd=mesh_as_pcd)
+                     mesh_as_pcd=mesh_as_pcd,
+                     keep_mesh=keep_mesh)
     if isinstance(data, tuple):
         color = [color, 'cool']
     else:
@@ -520,7 +547,8 @@ def setup_obj(obj_path: str | Tuple[str, str],
 
 def load_data(obj_path: str | Tuple[str, str] | Primitive,
               normalize: bool = True,
-              mesh_as_pcd: bool | int = False) -> Trimesh | PointCloud | Tuple[Trimesh, PointCloud]:
+              mesh_as_pcd: bool | int = False,
+              keep_mesh: bool = False) -> Trimesh | PointCloud | Tuple[Trimesh, PointCloud]:
     """Loads and processes 3D object data from various sources.
 
     This function can load 3D object data from a file path, a tuple of file paths, or a predefined primitive.
@@ -530,6 +558,7 @@ def load_data(obj_path: str | Tuple[str, str] | Primitive,
         obj_path: Path to the object file, a tuple of paths, or a predefined primitive.
         normalize: Whether to normalize the object.
         mesh_as_pcd: Whether to treat the mesh as a point cloud.
+        keep_mesh: Whether to keep the mesh object after creating the point cloud.
 
     Returns:
         A Trimesh, PointCloud, or a tuple of Trimesh and PointCloud, depending on the input and options.
@@ -583,7 +612,10 @@ def load_data(obj_path: str | Tuple[str, str] | Primitive,
         mesh.apply_scale(1 / mesh.extents.max())
 
     if isinstance(mesh, Trimesh) and mesh_as_pcd:
-        return PointCloud(mesh.sample(mesh_as_pcd if mesh_as_pcd > 1 else 4096))
+        pcd = PointCloud(mesh.sample(mesh_as_pcd if mesh_as_pcd > 1 else 4096))
+        if keep_mesh:
+            return mesh, pcd
+        return pcd
     return mesh
 
 
@@ -1099,6 +1131,80 @@ def make_camera(obj: bproc.types.MeshObject,
         bproc.camera.add_depth_of_field(focal_point_obj=None,
                                         fstop_value=fstop,
                                         focal_distance=focal_distance)
+
+
+def render_depth(obj: bproc.types.MeshObject,
+                 pcd: bool | int = False,
+                 keep_mesh: bool = False,
+                 color: Optional[Tuple[float, float, float] | Color | str] = None,
+                 cam_location: Tuple[float, float, float] = (1.5, 0, 1),
+                 roughness: Optional[float] = None,
+                 point_shape: Optional[Shape | str] = None,
+                 point_size: Optional[float] = None,
+                 look: Optional[Look | str] = None,
+                 noise: float = 0.002) -> Optional[bproc.types.MeshObject]:
+    """Renders a depth map of the given object and optionally converts it to a point cloud.
+
+    This function renders a depth map of the provided mesh object using ray tracing. It can either
+    return the depth map directly or convert it into a point cloud by sampling points from the
+    depth information. Various parameters control the appearance and processing of the output.
+
+    Args:
+        obj: The BlenderProc mesh object to render the depth map from
+        pcd: Whether to convert depth to point cloud and sample points (if int, specifies number of points)
+        keep_mesh: Whether to keep the original mesh when converting to point cloud
+        color: Color to apply to the generated point cloud
+        cam_location: Position of the camera in world space
+        roughness: Material roughness value for the point cloud
+        point_shape: Shape to use for point cloud visualization
+        point_size: Size of points in the point cloud
+        look: Visual style preset to apply to the rendering
+        noise: Amount of random noise to add to point positions
+
+    Returns:
+        The generated point cloud object if pcd=True, None if depth map only or input is point cloud
+
+    Raises:
+        NotImplementedError: When attempting to render depth map without converting to point cloud
+    """
+    is_mesh = len(obj.get_mesh().polygons) > 0
+    if not is_mesh:
+        logger.warning("Depth rendering not supported for point clouds.")
+        return
+
+    bvh_tree = bproc.object.create_bvh_tree_multi_objects([obj])
+    if pcd:
+        mesh = obj
+        resolution = get_camera_resolution()
+
+        bproc.camera.set_resolution(128, 128)
+        depth = bproc.camera.depth_via_raytracing(bvh_tree)
+        points = bproc.camera.pointcloud_from_depth(depth).reshape(-1, 3)
+
+        points = np.random.permutation(points[~np.isnan(points).any(axis=1)])[:pcd if pcd > 1 else 2048]
+        pcd = PointCloud(points + np.random.randn(*points.shape) * noise)
+        obj = make_obj(mesh_or_pcd=pcd)
+
+        material = obj.new_material('pointcloud_material')
+        material.set_principled_shader_value('Roughness', roughness or 0.9)
+        set_color(obj=obj,
+                  color=color or 'pointflow',
+                  camera_location=cam_location,
+                  instancer=point_shape is not None)
+        init_pointcloud(obj=obj,
+                        point_size=point_size,
+                        point_shape=point_shape)
+        if look is None and (color is None or color == 'pointflow'):
+            set_output_format(look=Look.VERY_LOW_CONTRAST)
+        bproc.camera.set_resolution(*resolution)
+        if keep_mesh:
+            obj.set_parent(mesh)
+            return mesh
+        mesh.delete()
+        return obj
+    else:
+        depth = bproc.camera.depth_via_raytracing(bvh_tree)
+        raise NotImplementedError("Depth rendering for meshes is not yet implemented.")
 
 
 def create_mp4_with_ffmpeg(image_folder: Path, output_path: Path, fps: int = 20):
