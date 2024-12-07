@@ -73,7 +73,7 @@ HDRIs can be obtained e.g. via `blenderproc download haven path/to/save/dir`.
 | Backdrop                       | Colored backdrop                      | HDRI backdrop                                                      |
 |--------------------------------|---------------------------------------|--------------------------------------------------------------------|
 | ![mesh](examples/backdrop.png) | ![pcd](examples/backdrop_colored.png) | ![mesh_depth](examples/hdri.png)                                   |
-| `--notransparent`              | `--notransparent --bg_color pale_red` | `--notransparent --backdrop path/to/hdri` |
+| `--notransparent`              | `--notransparent` `--bg_color pale_red` | `--notransparent` `--backdrop path/to/hdri` |
 
 ## Light
 
