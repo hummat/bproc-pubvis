@@ -33,6 +33,7 @@ class Color(Enum):
 
 
 class Strength(Enum):
+    OFF = 0.5
     WEAK = 0.6
     MEDIUM = 0.7
     STRONG = 1.0
@@ -240,7 +241,7 @@ def run(obj_path: str | Tuple[str, str],
 
     if gravity or backdrop:
         setup_backdrop(obj=obj,
-                       shadow_strength=Strength.MEDIUM,
+                       shadow_strength=Strength.OFF if isinstance(shadow, bool) and not shadow else Strength.MEDIUM,
                        transparent=transparent,
                        color=None if transparent else bg_color,
                        gravity=gravity,
@@ -251,7 +252,7 @@ def run(obj_path: str | Tuple[str, str],
 
     light = light or (Light.BRIGHT if is_mesh else Light.VERY_BRIGHT)
     light = light if isinstance(light, float) else Light[light.upper()].value if isinstance(light, str) else light.value
-    shadow = Shadow(shadow) if shadow else (Shadow.MEDIUM if is_mesh else Shadow.SOFT) if shadow is None else shadow
+    shadow = Shadow(shadow) if shadow else (Shadow.MEDIUM if is_mesh else Shadow.SOFT)
     make_lights(obj=obj,
                 shadow=shadow,
                 light_intensity=light)
@@ -1057,7 +1058,7 @@ def add_ambient_occlusion(obj: Optional[bproc.types.MeshObject] = None,
 
 
 def make_lights(obj: bproc.types.MeshObject,
-                shadow: Shadow | str | bool = Shadow.MEDIUM,
+                shadow: Shadow | str = Shadow.MEDIUM,
                 light_intensity: float = 0.2,
                 fill_light: bool = False,
                 rim_light: bool = False):
@@ -1079,17 +1080,14 @@ def make_lights(obj: bproc.types.MeshObject,
     key_light.set_location([1, 0.5, 2])
     key_light.set_rotation_mat(bproc.camera.rotation_from_forward_vec(obj.get_location() - key_light.get_location()))
     scale = 1
-    if shadow:
-        if Shadow(shadow) is Shadow.VERY_HARD:
-            scale = 0.01
-        elif Shadow(shadow) is Shadow.HARD:
-            scale = 0.1
-        elif Shadow(shadow) is Shadow.SOFT:
-            scale = 3
-        elif Shadow(shadow) is Shadow.VERY_SOFT:
-            scale = 5
-    else:
-        key_light.blender_obj.data.use_shadow = False
+    if Shadow(shadow) is Shadow.VERY_HARD:
+        scale = 0.01
+    elif Shadow(shadow) is Shadow.HARD:
+        scale = 0.1
+    elif Shadow(shadow) is Shadow.SOFT:
+        scale = 3
+    elif Shadow(shadow) is Shadow.VERY_SOFT:
+        scale = 5
     key_light.set_scale([scale] * 3)
     key_light.set_energy(int(150 * light_intensity))
 

@@ -93,7 +93,7 @@ Shadows are rendered by default. To disable them, use the `--noshadow` option. T
 | Soft shadow                       | Hard shadow                      | No shadow                            |
 |-----------------------------------|----------------------------------|--------------------------------------|
 | ![mesh](examples/shadow_soft.png) | ![pcd](examples/shadow_hard.png) | ![mesh_depth](examples/noshadow.png) |
-| `--shadow soft`                   | `--shadow hard`                  | `--noshadow` `--light medium`        |
+| `--shadow soft`                   | `--shadow hard`                  | `--noshadow`                         |
 
 ### Shading
 
