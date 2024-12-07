@@ -33,10 +33,10 @@ The following options can be added to:
 You can test you render settings using any of the `Blender` primitives (`monkey`, `cube`, `sphere`, `cone`, 
 `cylinder`, ...) as the first argument.
 
-| Mesh                                     | Point cloud              | Depth                                                            |
-|------------------------------------------|--------------------------|------------------------------------------------------------------|
-| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png) | ![mesh_depth](examples/depth.png)                                |
-| `--obj_path suzanne` (or just `suzanne`) | `--pcd`                  | `--pcd 1024` `--point_size 0.01` `--depth` `--color cool` `--ao` |
+| Mesh                                     | Point cloud              | Depth                                      |
+|------------------------------------------|--------------------------|--------------------------------------------|
+| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png) | ![mesh_depth](examples/depth.png)          |
+| `--obj_path suzanne` (or just `suzanne`) | `--pcd`                  | `--pcd 1024` `--point_size 0.01` `--depth` |
 
 ## Basic Options
 
@@ -54,10 +54,9 @@ Some examples of additional options to customize the rendering are shown below.
 ### Color
 
 To change the color of the rendered object, use the `--color` option using either any of the predefined colors (e.g. 
-`pale_violet`), choosing from those at random (`random_color`), a completely random color (`random`), or a 
-three-tuple of RGB values in range 0-1 (e.g. `(0.8,0.5,0.2)`). 
-Point clouds can additionally be colored using any of the 
-[`matplotlib` colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html). The background color can be
+`pale_violet`), choosing from those at random (`random_color`), a completely random color (`random`), or a three-tuple
+of RGB values in range 0-1, e.g (`0.8,0.5,0.2`). Point clouds can additionally be colored using any of the 
+`matplotlib` [colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html). The background color can be
 changed using the `--bg_color` option.
 
 | Mesh                             | Point cloud                    | Background                           |
@@ -88,7 +87,7 @@ between 0 and 1 or `very_dark`, `dark`, `medium`, `bright`, or `very_bright` to 
 ### Shadow
 
 Shadows are rendered by default. To disable them, use the `--noshadow` option. To make the shadow softer, use 
-`--shadow soft` or --shadow=hard` for a harder shadow.
+`--shadow soft` or `--shadow=hard` for a harder shadow.
 
 | Soft shadow                       | Hard shadow                      | No shadow                            |
 |-----------------------------------|----------------------------------|--------------------------------------|
@@ -151,7 +150,7 @@ model-viewer {
     auto-rotate>
 </model-viewer>
 ```
-in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.com/bproc-pubvis)) of this repository) to display the object.
+in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.com/bproc-pubvis) of this repository) to display the object.
 
 ### Further Options
 
@@ -169,7 +168,7 @@ Some additional useful options include:
 ## Debugging
 
 `BlenderProc` supports visual debugging inside `Blender` using `blenderproc debug` instead of `blenderproc run`. 
-Adding `--debug` will further disable rendering and only setup the scene.
+Adding `--debug` will further disable rendering and only set up the scene.
 
 ## Credits
 

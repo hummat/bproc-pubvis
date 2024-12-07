@@ -97,7 +97,8 @@ class Light(Enum):
 
 
 def run(obj_path: str | Tuple[str, str],
-        normalize: bool = True,
+        center: bool = True,
+        scale: bool = True,
         rotate: Optional[Tuple[float, float, float]] = (0, 0, -35),
         gravity: bool = False,
         animate: Optional[Animation | str | bool] = None,
@@ -140,7 +141,8 @@ def run(obj_path: str | Tuple[str, str],
 
     Args:
         obj_path: Path to the 3D object file or tuple containing path and object name
-        normalize: Whether to normalize the object scale
+        center: Whether to center the object at the origin
+        scale: Whether to scale the object to fit within a unit cube
         rotate: Initial rotation angles (x, y, z) in degrees
         gravity: Whether to enable physics-based gravity simulation
         animate: Animation type to apply (turn, tumble) or False for static render
@@ -187,7 +189,7 @@ def run(obj_path: str | Tuple[str, str],
 
     init_renderer(resolution=resolution,
                   transparent=transparent or bg_color is not None,
-                  look=look or Look.MEDIUM_CONTRAST,
+                  look=look,
                   exposure=exposure,
                   engine=engine,
                   noise_threshold=noise_threshold or 0.01,
@@ -196,23 +198,28 @@ def run(obj_path: str | Tuple[str, str],
     animate = Animation.TURN if isinstance(animate, bool) else Animation(animate) if animate else None
     point_shape = Shape.SPHERE if animate in [Animation.TURN, Animation.TUMBLE] else point_shape
     obj = setup_obj(obj_path=obj_path,
-                    normalize=normalize,
+                    center=center,
+                    scale=scale,
                     mesh_as_pcd=pcd and not depth,
                     keep_mesh=keep_mesh,
                     set_material=not keep_material,
-                    color=Color.WARM_GREY if depth else color,
+                    color=color,
                     cam_location=cam_location,
                     roughness=roughness,
                     point_shape=point_shape,
                     rotate=rotate,
                     shade=shade,
-                    point_size=point_size,
-                    look=look)
+                    point_size=point_size)
 
     make_camera(obj=obj,
                 location=cam_location,
                 offset=cam_offset,
                 fstop=fstop)
+
+    set_look(look=look,
+             color=color,
+             pcd=pcd,
+             depth=depth)
 
     if depth:
         obj = render_depth(obj=obj,
@@ -223,8 +230,10 @@ def run(obj_path: str | Tuple[str, str],
                            roughness=roughness,
                            point_shape=point_shape,
                            point_size=point_size,
-                           look=look)
-        if obj is None:
+                           bg_color=bg_color,
+                           save=None if save is None else Path(save),
+                           show=show or not save)
+        if not obj:
             return
 
     is_mesh = len(obj.get_mesh().polygons) > 0
@@ -247,28 +256,31 @@ def run(obj_path: str | Tuple[str, str],
                        gravity=gravity,
                        offset=offset)
 
-    if ao or (ao is None and is_mesh):
-        add_ambient_occlusion(strength=0.5 if isinstance(ao, bool) or ao is None else ao)
+    if ao or (ao is None and (is_mesh or depth)):
+        ao = 0.5 if isinstance(ao, bool) or ao is None else ao
+        logger.debug(f"Setting ambient occlusion strength to {ao}")
+        add_ambient_occlusion(strength=ao)
 
-    light = light or (Light.BRIGHT if is_mesh else Light.VERY_BRIGHT)
+    light = light or (Light.BRIGHT if (is_mesh or depth) else Light.VERY_BRIGHT)
+    logger.debug(f"Setting light intensity to {light}")
     light = light if isinstance(light, float) else Light[light.upper()].value if isinstance(light, str) else light.value
-    shadow = Shadow(shadow) if shadow else (Shadow.MEDIUM if is_mesh else Shadow.SOFT)
+    shadow = Shadow(shadow) if shadow else (Shadow.MEDIUM if (is_mesh or depth) else Shadow.SOFT)
+    logger.debug(f"Setting shadow type to {shadow}")
     make_lights(obj=obj,
                 shadow=shadow,
                 light_intensity=light)
 
-    show = show or save is None
     if animate:
-        save = Path(animate.value).with_suffix('.gif') if save is None else Path(save)
+        save = Path(animate.value).with_suffix('.gif') if not save else Path(save)
         make_animation(obj=obj,
                        save=save,
                        animation=animate,
                        bg_color=bg_color,
                        debug=debug)
     elif not debug:
-        render(bg_color=bg_color,
-               save=None if save is None else Path(save),
-               show=show)
+        render_color(bg_color=bg_color,
+                     save=None if save is None else Path(save),
+                     show=show or not save)
 
     if export:
         export_obj(obj=obj,
@@ -312,10 +324,13 @@ def set_output_format(look: Optional[Look | str] = None,
     """
     import bpy
     if look is not None:
+        logger.debug(f"Setting look to {look}")
         bpy.context.scene.view_settings.look = Look(look).value
     if exposure is not None:
+        logger.debug(f"Setting exposure to {exposure}")
         bpy.context.scene.view_settings.exposure = exposure
     if gamma is not None:
+        logger.debug(f"Setting gamma to {gamma}")
         bpy.context.scene.view_settings.gamma = gamma
 
 
@@ -463,7 +478,8 @@ def init_renderer(resolution: int | Tuple[int, int],
 
 
 def setup_obj(obj_path: str | Tuple[str, str],
-              normalize: bool = True,
+              center: bool = True,
+              scale: bool = True,
               mesh_as_pcd: bool | int = False,
               keep_mesh: bool = False,
               set_material: bool = True,
@@ -473,8 +489,7 @@ def setup_obj(obj_path: str | Tuple[str, str],
               point_shape: Optional[Shape | str] = None,
               rotate: Optional[Tuple[float, float, float]] = None,
               shade: Shading | str = Shading.FLAT,
-              point_size: Optional[float] = None,
-              look: Optional[Look | str] = None) -> bproc.types.MeshObject:
+              point_size: Optional[float] = None) -> bproc.types.MeshObject:
     """Sets up a 3D object in BlenderProc.
 
     This function loads and processes 3D object data from various sources, applies materials,
@@ -483,7 +498,8 @@ def setup_obj(obj_path: str | Tuple[str, str],
 
     Args:
         obj_path: Path to the object file or a tuple of paths.
-        normalize: Whether to normalize the object.
+        center: Whether to center the object at the origin.
+        scale: Whether to normalize the object to fit within a unit cube.
         mesh_as_pcd: Whether transform the mesh into a point cloud by sampling points from the surface.
         keep_mesh: Whether to keep the mesh object after creating the point cloud.
         set_material: Whether to set a material for the object.
@@ -494,13 +510,13 @@ def setup_obj(obj_path: str | Tuple[str, str],
         rotate: The rotation to apply to the object.
         shade: The shading mode to apply to the object.
         point_size: The size of the points if the object is a point cloud.
-        look: The look to apply to the scene view settings.
 
     Returns:
         The created and configured BlenderProc mesh object.
     """
     data = load_data(obj_path=obj_path,
-                     normalize=normalize,
+                     center=center,
+                     scale=scale,
                      mesh_as_pcd=mesh_as_pcd,
                      keep_mesh=keep_mesh)
     if isinstance(data, tuple):
@@ -529,8 +545,6 @@ def setup_obj(obj_path: str | Tuple[str, str],
             init_pointcloud(obj=obj,
                             point_size=point_size,
                             point_shape=point_shape)
-            if look is None and (c is None or c == 'pointflow'):
-                set_output_format(look=Look.VERY_LOW_CONTRAST)
         objs.append(obj)
 
     mesh = objs[0]
@@ -547,7 +561,8 @@ def setup_obj(obj_path: str | Tuple[str, str],
 
 
 def load_data(obj_path: str | Tuple[str, str] | Primitive,
-              normalize: bool = True,
+              center: bool = True,
+              scale: bool = True,
               mesh_as_pcd: bool | int = False,
               keep_mesh: bool = False) -> Trimesh | PointCloud | Tuple[Trimesh, PointCloud]:
     """Loads and processes 3D object data from various sources.
@@ -557,7 +572,8 @@ def load_data(obj_path: str | Tuple[str, str] | Primitive,
 
     Args:
         obj_path: Path to the object file, a tuple of paths, or a predefined primitive.
-        normalize: Whether to normalize the object.
+        center: Whether to center the object at the origin.
+        scale: Whether to normalize the object to fit within a unit cube.
         mesh_as_pcd: Whether to treat the mesh as a point cloud.
         keep_mesh: Whether to keep the mesh object after creating the point cloud.
 
@@ -573,12 +589,13 @@ def load_data(obj_path: str | Tuple[str, str] | Primitive,
         else:
             pcd = PointCloud(obj_2.vertices)
             mesh = Trimesh(obj_1.vertices, obj_1.faces)
-        if normalize:
+        if center:
             offset = -mesh.bounds.mean(axis=0)
-            scale = 1 / mesh.extents.max()
             mesh.apply_translation(offset)
-            mesh.apply_scale(scale)
             pcd.apply_translation(offset)
+        if scale:
+            scale = 1 / mesh.extents.max()
+            mesh.apply_scale(scale)
             pcd.apply_scale(scale)
         return mesh, pcd
 
@@ -608,8 +625,9 @@ def load_data(obj_path: str | Tuple[str, str] | Primitive,
         mesh = trimesh.load(obj_path, force='mesh')
     if not isinstance(mesh, (Trimesh, PointCloud)):
         raise TypeError(f"Invalid object type: {type(mesh)}")
-    if normalize:
+    if center:
         mesh.apply_translation(-mesh.bounds.mean(axis=0))
+    if scale:
         mesh.apply_scale(1 / mesh.extents.max())
 
     if isinstance(mesh, Trimesh) and mesh_as_pcd:
@@ -713,6 +731,39 @@ def set_color(obj: bproc.types.MeshObject,
         material.set_principled_shader_value('Base Color', [*get_color(color), 1])
 
 
+def set_background_color(image: Image.Image, color: Tuple[float, float, float] | Color | str):
+    color = get_color(color)
+    if isinstance(color, Color) or (isinstance(color, str) and hasattr(Color, color.upper())):
+        color = (np.array(color) + 0.3).clip(0, 1)
+    background = Image.new('RGBA', image.size, tuple(int(c * 255) for c in color))
+    return Image.alpha_composite(background, image)
+
+
+def set_look(look: Optional[Look | str] = None,
+             color: Optional[Tuple[float, float, float] | Color | str] = None,
+             pcd: bool = False,
+             depth: bool = False):
+    """Sets the visual style for the BlenderProc renderer.
+
+    This function sets the visual style for the BlenderProc renderer based on the given parameters. If no look is
+    specified, it automatically determines the look based on the input data and visualization type.
+
+    Args:
+        look: The visual style to apply to the renderer
+        color: The color to apply to the object
+        pcd: Whether the object is being visualized as a point cloud
+        depth: Whether the object is being visualized as a depth map
+    """
+    if not look:
+        look = Look.MEDIUM_CONTRAST
+        if pcd:
+            if depth and (not color or color in plt.colormaps()):
+                look = Look.VERY_HIGH_CONTRAST
+            elif not color or color == 'pointflow':
+                look = Look.VERY_LOW_CONTRAST
+    set_output_format(look=look)
+
+
 def setup_backdrop(obj: bproc.types.MeshObject,
                    shadow_strength: Strength | str = Strength.MEDIUM,
                    transparent: bool | float = True,
@@ -733,7 +784,8 @@ def setup_backdrop(obj: bproc.types.MeshObject,
         gravity: Whether to enable gravity for the object and the backdrop.
         offset: The offset to apply to the backdrop's position.
     """
-    plane = bproc.loader.load_obj('backdrop.ply')[0]
+    with stdout_redirected():
+        plane = bproc.loader.load_obj('backdrop.ply')[0]
     plane.clear_materials()
     material = plane.new_material('backdrop_material')
     material.set_principled_shader_value('Base Color', [*get_color(color), 1])
@@ -1131,6 +1183,26 @@ def make_camera(obj: bproc.types.MeshObject,
                                         focal_distance=focal_distance)
 
 
+def normalize(values: np.ndarray,
+              a: float = 0,
+              b: float = 1) -> np.ndarray:
+    min_val = values.min()
+    max_val = values.max()
+    if min_val == max_val:
+        return (values / max_val) * a
+    return (values - min_val) / (max_val - min_val) * (b - a) + a
+
+
+def depth_to_image(depth: np.ndarray, cmap: str = 'Greys_r') -> Image.Image:
+    empty_mask = depth == 0
+    depth[~empty_mask] = normalize(depth[~empty_mask], 0.1, 1)
+    cmap = plt.get_cmap(cmap)
+    depth = cmap(depth)
+    depth[empty_mask] = 0
+    depth[~empty_mask] *= 255
+    return Image.fromarray(depth.astype(np.uint8))
+
+
 def render_depth(obj: bproc.types.MeshObject,
                  pcd: bool | int = False,
                  keep_mesh: bool = False,
@@ -1139,8 +1211,10 @@ def render_depth(obj: bproc.types.MeshObject,
                  roughness: Optional[float] = None,
                  point_shape: Optional[Shape | str] = None,
                  point_size: Optional[float] = None,
-                 look: Optional[Look | str] = None,
-                 noise: float = 0.002) -> Optional[bproc.types.MeshObject]:
+                 noise: float = 0.002,
+                 bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
+                 save: Optional[Path] = None,
+                 show: bool = False) -> Optional[bproc.types.MeshObject]:
     """Renders a depth map of the given object and optionally converts it to a point cloud.
 
     This function renders a depth map of the provided mesh object using ray tracing. It can either
@@ -1156,8 +1230,10 @@ def render_depth(obj: bproc.types.MeshObject,
         roughness: Material roughness value for the point cloud
         point_shape: Shape to use for point cloud visualization
         point_size: Size of points in the point cloud
-        look: Visual style preset to apply to the rendering
         noise: Amount of random noise to add to point positions
+        bg_color: Background color for the rendered depth map
+        save: Path to save the rendered depth map as an image file
+        show: Whether to display the rendered depth map
 
     Returns:
         The generated point cloud object if pcd=True, None if depth map only or input is point cloud
@@ -1186,14 +1262,12 @@ def render_depth(obj: bproc.types.MeshObject,
         material = obj.new_material('pointcloud_material')
         material.set_principled_shader_value('Roughness', roughness or 0.9)
         set_color(obj=obj,
-                  color=color or 'pointflow',
+                  color=color or 'plasma_r',
                   camera_location=cam_location,
                   instancer=point_shape is not None)
         init_pointcloud(obj=obj,
                         point_size=point_size,
                         point_shape=point_shape)
-        if look is None and (color is None or color == 'pointflow'):
-            set_output_format(look=Look.VERY_LOW_CONTRAST)
         bproc.camera.set_resolution(*resolution)
         if keep_mesh:
             obj.set_parent(mesh)
@@ -1202,7 +1276,14 @@ def render_depth(obj: bproc.types.MeshObject,
         return obj
     else:
         depth = bproc.camera.depth_via_raytracing(bvh_tree)
-        raise NotImplementedError("Depth rendering for meshes is not yet implemented.")
+        depth = np.nan_to_num(depth, nan=0, posinf=0, neginf=0)
+        image = depth_to_image(depth=depth, cmap=color or 'plasma_r')
+        if bg_color:
+            image = set_background_color(image, bg_color)
+        if save:
+            image.save(Path(save).resolve())
+        if show:
+            image.show()
 
 
 def create_mp4_with_ffmpeg(image_folder: Path, output_path: Path, fps: int = 20):
@@ -1282,7 +1363,7 @@ def make_animation(obj: bproc.types.MeshObject,
 
     if not debug:
         save = Path(save).resolve()
-        images = render(bg_color=bg_color or Color.WHITE if save.suffix == '.gif' else bg_color)
+        images = render_color(bg_color=bg_color or Color.WHITE if save.suffix == '.gif' else bg_color)
         images[0].save(save.with_suffix('.png'))
 
         if save.suffix == '.gif':
@@ -1303,10 +1384,10 @@ def make_animation(obj: bproc.types.MeshObject,
             image_folder.rmdir()
 
 
-def render(bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
-           save: Optional[Path] = None,
-           show: bool = False,
-           progress: bool = True) -> List[Image]:
+def render_color(bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
+                 save: Optional[Path] = None,
+                 show: bool = False,
+                 progress: bool = True) -> List[Image]:
     """Renders the scene and returns a list of images.
 
     This function renders the current BlenderProc scene and returns a list of images.
@@ -1328,14 +1409,8 @@ def render(bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
     images_np: List[np.ndarray] = data['colors']
     for i, image_np in enumerate(images_np):
         image = Image.fromarray(image_np.astype(np.uint8))
-
-        if bg_color is not None:
-            color = get_color(bg_color)
-            if isinstance(bg_color, Color) or (isinstance(bg_color, str) and hasattr(Color, bg_color.upper())):
-                color = (np.array(color) + 0.3).clip(0, 1)
-            background = Image.new('RGBA', image.size, tuple(int(c * 255) for c in color))
-            image = Image.alpha_composite(background, image)
-
+        if bg_color:
+            image = set_background_color(image, bg_color)
         if save:
             image.save(Path(save).resolve())
         if show:
