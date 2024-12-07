@@ -60,7 +60,7 @@ changed using the `--bg_color` option.
 | Mesh                             | Point cloud                    | Background                           |
 |----------------------------------|--------------------------------|--------------------------------------|
 | ![mesh](examples/mesh_color.png) | ![pcd](examples/pcd_color.png) | ![mesh_depth](examples/bg_color.png) |
-| `--color bright_blue`            | `--pcd` `--color plasma`       | `--bg_color pale_turquoise`          |
+| `--color bright_blue`            | `--pcd` `--color cool`       | `--bg_color pale_turquoise`          |
 
 ### Background
 
