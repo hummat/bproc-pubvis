@@ -115,9 +115,10 @@ def run(obj_path: str | Tuple[str, str],
         cam_offset: Tuple[float, float, float] = (0, 0, 0),
         resolution: int | Tuple[int, int] = 512,
         fstop: Optional[float] = None,
-        backdrop: bool = True,
+        backdrop: [bool | str] = True,
         light: Optional[Light | str | float] = None,
         bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
+        bg_light: float = 0.15,
         transparent: bool | float = True,
         look: Optional[Look | str] = None,
         exposure: float = 0,
@@ -162,6 +163,7 @@ def run(obj_path: str | Tuple[str, str],
         backdrop: Whether to include a backdrop plane
         light: Lighting intensity preset or custom value
         bg_color: Background color in RGB format
+        bg_light: Background light intensity
         transparent: Whether to render with transparency
         look: Visual style preset to apply
         exposure: Global exposure adjustment
@@ -231,7 +233,7 @@ def run(obj_path: str | Tuple[str, str],
                            point_shape=point_shape,
                            point_size=point_size,
                            bg_color=bg_color,
-                           save=None if save is None else Path(save),
+                           save=None if save is None else Path(save).resolve(),
                            show=show or not save)
         if not obj:
             return
@@ -248,11 +250,16 @@ def run(obj_path: str | Tuple[str, str],
             gravity = False
         offset = np.array([0, 0, -0.6])
 
+    light = light or Light.BRIGHT
+    logger.debug(f"Setting light intensity to {light}")
+    light = light if isinstance(light, float) else Light[light.upper()].value if isinstance(light, str) else light.value
     if gravity or backdrop:
         setup_backdrop(obj=obj,
                        shadow_strength=Strength.OFF if isinstance(shadow, bool) and not shadow else Strength.MEDIUM,
                        transparent=transparent,
                        color=None if transparent else bg_color,
+                       hdri_path=Path(backdrop).resolve() if isinstance(backdrop, str) else None,
+                       bg_light=bg_light * light,
                        gravity=gravity,
                        offset=offset)
 
@@ -261,9 +268,6 @@ def run(obj_path: str | Tuple[str, str],
         logger.debug(f"Setting ambient occlusion strength to {ao}")
         add_ambient_occlusion(strength=ao)
 
-    light = light or (Light.BRIGHT if (is_mesh or depth) else Light.VERY_BRIGHT)
-    logger.debug(f"Setting light intensity to {light}")
-    light = light if isinstance(light, float) else Light[light.upper()].value if isinstance(light, str) else light.value
     shadow = Shadow(shadow) if shadow else (Shadow.MEDIUM if (is_mesh or depth) else Shadow.SOFT)
     logger.debug(f"Setting shadow type to {shadow}")
     make_lights(obj=obj,
@@ -271,7 +275,7 @@ def run(obj_path: str | Tuple[str, str],
                 light_intensity=light)
 
     if animate:
-        save = Path(animate.value).with_suffix('.gif') if not save else Path(save)
+        save = Path(animate.value).with_suffix('.gif') if not save else Path(save).resolve()
         make_animation(obj=obj,
                        save=save,
                        animation=animate,
@@ -279,7 +283,7 @@ def run(obj_path: str | Tuple[str, str],
                        debug=debug)
     elif not debug:
         render_color(bg_color=bg_color,
-                     save=None if save is None else Path(save),
+                     save=None if save is None else Path(save).resolve(),
                      show=show or not save)
 
     if export:
@@ -708,10 +712,9 @@ def set_color(obj: bproc.types.MeshObject,
                 colors.append(cmap(*value))
         else:
             cmap = plt.get_cmap(color)
-            distances = np.linalg.norm(values - np.array(camera_location), axis=1)
-            distances = (distances - distances.min()) / (distances.max() - distances.min())
-            for d in distances:
-                colors.append(cmap(d))
+            distances = normalize(np.linalg.norm(values - np.array(camera_location), axis=1))
+            for dist in distances:
+                colors.append(cmap(dist))
 
         # TODO: Is this possible with BlenderProc, i.e. obj.new_attribute?
         mesh = obj.get_mesh()
@@ -768,6 +771,8 @@ def setup_backdrop(obj: bproc.types.MeshObject,
                    shadow_strength: Strength | str = Strength.MEDIUM,
                    transparent: bool | float = True,
                    color: Optional[Tuple[float, float, float] | Color | str] = None,
+                   hdri_path: Optional[Path] = None,
+                   bg_light: float = 0.15,
                    gravity: bool = False,
                    offset: np.ndarray = np.array([0, 0, -0.05])):
     """Sets up a backdrop for the given object in the Blender scene.
@@ -777,13 +782,25 @@ def setup_backdrop(obj: bproc.types.MeshObject,
     rigid body physics for the object and the backdrop and simulates the physics to fix their final poses.
 
     Args:
-        obj: The BlenderProc mesh object for which the backdrop is being set up.
-        shadow_strength: The strength of the shadow to be applied to the backdrop.
-        transparent: Whether the backdrop should be transparent.
-        color: The color to apply to the backdrop.
-        gravity: Whether to enable gravity for the object and the backdrop.
-        offset: The offset to apply to the backdrop's position.
+        obj: The BlenderProc mesh object for which the backdrop is being set up
+        shadow_strength: The strength of the shadow to be applied to the backdrop
+        transparent: Whether the backdrop should be transparent
+        color: The color to apply to the backdrop
+        hdri_path: The path to an HDRI image to use as backdrop or to the HAVEN dataset
+        bg_light: The intensity of the background light
+        gravity: Whether to enable gravity for the object and the backdrop
+        offset: The offset to apply to the backdrop's position
     """
+    if hdri_path:
+        if (hdri_path / 'hdri').exists():
+            hdri_path = bproc.loader.get_random_world_background_hdr_img_path_from_haven(str(hdri_path))
+        logger.debug(f"Setting HDRI backdrop to {hdri_path.stem}")
+        bproc.world.set_world_background_hdr_img(str(hdri_path), strength=bg_light)
+        if gravity:
+            logger.warning("Gravity is not compatible with an HDRI backdrop.")
+        return
+    bproc.renderer.set_world_background([1, 1, 1], strength=bg_light)
+
     with stdout_redirected():
         plane = bproc.loader.load_obj('backdrop.ply')[0]
     plane.clear_materials()
@@ -1120,14 +1137,12 @@ def make_lights(obj: bproc.types.MeshObject,
     It sets the world background, positions the lights, and adjusts their properties based on the provided parameters.
 
     Args:
-        obj: The BlenderProc mesh object for which the lighting is being set up.
-        shadow: The type of shadow to apply to the key light.
-        light_intensity: The intensity of the key light.
-        fill_light: Whether to add a fill light to the scene.
-        rim_light: Whether to add a rim light to the scene.
+        obj: The BlenderProc mesh object for which the lighting is being set up
+        shadow: The type of shadow to apply to the key light
+        light_intensity: The intensity of the key light
+        fill_light: Whether to add a fill light to the scene
+        rim_light: Whether to add a rim light to the scene
     """
-    bproc.renderer.set_world_background([1, 1, 1], strength=0.15 * light_intensity)
-
     key_light = bproc.types.Light('AREA', name='key_light')
     key_light.set_location([1, 0.5, 2])
     key_light.set_rotation_mat(bproc.camera.rotation_from_forward_vec(obj.get_location() - key_light.get_location()))

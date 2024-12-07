@@ -13,14 +13,13 @@ blenderproc pip install fire loguru
 
 The first call of `blenderproc` will download [`Blender`](https://blender.org). If you already have a local 
 installation, you can use 
-`--custom-blender-path /path/to/blender` (this also needs to be used for all subsequent calls of `blenderproc`).
+`--custom-blender-path path/to/blender` (this also needs to be used for all subsequent calls of `blenderproc`).
 
 ## Basic Usage
 To render a mesh (or point cloud if the input is one), simply run:
 ```bash
 blenderproc run main.py path/to/3d.obj
 ```
-
 The following options can be added to:
 * **save** the rendered image: `--save path/to/output.png`
 * **export** the object: `--export path/to/output.obj` (use `.glb` for a web-friendly format)
@@ -31,10 +30,10 @@ The following options can be added to:
 You can test you render settings using any of the `Blender` primitives (`monkey`, `cube`, `sphere`, `cone`, 
 `cylinder`, ...) as the first argument.
 
-| Mesh                                     | Point cloud              | Depth                                      |
-|------------------------------------------|--------------------------|--------------------------------------------|
-| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png) | ![mesh_depth](examples/depth.png)          |
-| `--obj_path suzanne` (or just `suzanne`) | `--pcd`                  | `--pcd 1024` `--point_size 0.01` `--depth` |
+| Mesh                                     | Point cloud                   | Depth                                      |
+|------------------------------------------|-------------------------------|--------------------------------------------|
+| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png)      | ![mesh_depth](examples/depth.png)          |
+| `--obj_path suzanne` (or just `suzanne`) | `--pcd` `--light very_bright` | `--pcd 1024` `--point_size 0.01` `--depth` |
 
 ## Basic Options
 
@@ -60,17 +59,18 @@ changed using the `--bg_color` option.
 | Mesh                             | Point cloud                    | Background                           |
 |----------------------------------|--------------------------------|--------------------------------------|
 | ![mesh](examples/mesh_color.png) | ![pcd](examples/pcd_color.png) | ![mesh_depth](examples/bg_color.png) |
-| `--color bright_blue`            | `--pcd` `--color cool`       | `--bg_color pale_turquoise`          |
+| `--color bright_blue`            | `--pcd` `--color cool`         | `--bg_color pale_turquoise`          |
 
 ### Background
 
 By default, the background is transparent. To change this, use the `--bg_color` option as shown above. Additionally, 
-`--notransparent` can be used to render the backdrop object.
+`--notransparent` can be used to render the backdrop object. To use HDRI images as backdrops, use `--backdrop path/to/hdri`.
+HDRIs can be obtained e.g. via `blenderproc download haven path/to/save/dir`.
 
-| Backdrop                       | Colored backdrop                      |
-|--------------------------------|---------------------------------------|
-| ![mesh](examples/backdrop.png) | ![pcd](examples/backdrop_colored.png) |
-| `--notransparent`              | `--notransparent --bg_color pale_red` |
+| Backdrop                       | Colored backdrop                      | HDRI backdrop                                                      |
+|--------------------------------|---------------------------------------|--------------------------------------------------------------------|
+| ![mesh](examples/backdrop.png) | ![pcd](examples/backdrop_colored.png) | ![mesh_depth](examples/hdri.png)                                   |
+| `--notransparent`              | `--notransparent --bg_color pale_red` | `--notransparent --backdrop path/to/photo_studio_loft_hall_2k.hdr` |
 
 ## Light
 
@@ -123,7 +123,7 @@ To create an animation, use the `--animate` option. The `--frames` option can be
 
 ### Interactive 3D Visualization
 
-To provide an interactive 3D visualization, use `--export /path/to/mesh.glb` to export the object as a `.glb` file and
+To provide an interactive 3D visualization, use `--export path/to/mesh.glb` to export the object as a `.glb` file and
 use
 ```html
 <script 
@@ -142,7 +142,7 @@ model-viewer {
 </style>
 
 <model-viewer 
-    src="/path/to/mesh.glb" 
+    src="path/to/mesh.glb" 
     camera-controls tone-mapping="neutral" 
     shadow-intensity="1" 
     auto-rotate>
