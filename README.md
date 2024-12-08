@@ -1,3 +1,9 @@
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:site" content="https://hummat.github.io/bproc-pubvis" />
+<meta name="twitter:title" content="BlenderProc Publication Visualization" />
+<meta name="twitter:description" content="Publication-ready visualization of 3D objects and point clouds in seconds." />
+<meta name="twitter:image" content="https://hummat.github.io/bproc-pubvis/examples/mesh_depth.png" />
+
 # [BlenderProc](https://github.com/DLR-RM/BlenderProc) Publication Visualization
 Publication-ready visualization of 3D objects and point clouds in seconds.
 
