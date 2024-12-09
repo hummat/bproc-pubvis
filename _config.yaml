@@ -1,1 +1,8 @@
 theme: jekyll-theme-cayman
+title: BlenderProc Publication Visualization
+url: https://hummat.github.io/bproc-pubvis
+twitter:
+  username: matthiashumt
+  card: summary_large_image
+logo: https://avatars.githubusercontent.com/u/22399283?v=4
+image: https://hummat.github.io/bproc-pubvis/examples/mesh_depth.png
