@@ -9,13 +9,13 @@ description = "Publication-ready visualization of 3D objects and point clouds in
 authors = [
     {name = "Matthias Humt", email = "github.gizzard320@passmail.net"},
 ]
-license = {text = "MIT"}
+license = {text = "GPL-3.0"}
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Visualization",
 ]
