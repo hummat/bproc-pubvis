@@ -1,6 +1,4 @@
 remote-theme: pages-themes/cayman
-plugins:
-  - jekyll-seo-tag
 title: BlenderProc Publication Visualization
 description: Publication-ready visualization of 3D objects and point clouds in seconds.
 url: https://hummat.github.io/bproc-pubvis
