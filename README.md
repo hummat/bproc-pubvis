@@ -1,4 +1,11 @@
-<meta name="twitter:card" content="summary" />
+<meta name="og:type" content="summary" />
+<meta property="og:url" content="https://hummat.github.io/bproc-pubvis" />
+<meta name="og:site_name" content="BlenderProc Publication Visualization" />
+<meta name="og:title" content="BlenderProc Publication Visualization" />
+<meta name="og:description" content="Publication-ready visualization of 3D objects and point clouds in seconds." />
+<meta name="og:image" content="https://hummat.github.io/bproc-pubvis/examples/mesh_depth.png" />
+
+<meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="https://hummat.github.io/bproc-pubvis" />
 <meta name="twitter:title" content="BlenderProc Publication Visualization" />
 <meta name="twitter:description" content="Publication-ready visualization of 3D objects and point clouds in seconds." />
