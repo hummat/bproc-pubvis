@@ -164,7 +164,7 @@ model-viewer {
     auto-rotate>
 </model-viewer>
 ```
-in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.com/bproc-pubvis) of this repository) to display the object.
+in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.github.io/bproc-pubvis) of this repository) to display the object.
 
 ### Further Options
 
