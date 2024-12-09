@@ -7,7 +7,7 @@ Publication-ready visualization of 3D objects and point clouds in seconds.
 
 ## Installation
 ```bash
-pip install bproc-pubvis
+pip install git+https://github.com/hummat/bproc-pubvis.git
 blenderproc pip install fire loguru
 ```
 
