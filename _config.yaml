@@ -1,6 +1,5 @@
-remote-theme: pages-themes/cayman
+theme: jekyll-theme-cayman
 title: BlenderProc Publication Visualization
-description: Publication-ready visualization of 3D objects and point clouds in seconds.
 url: https://hummat.github.io/bproc-pubvis
 twitter:
   username: matthiashumt
