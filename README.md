@@ -29,9 +29,12 @@ The following options can be added to:
 * render the mesh as **point cloud**: `--pcd`
 * render the mesh as **depth** image: `--depth`
 * render the mesh as **point cloud** from projected **depth** image: `--pcd` `--depth`
+* keep the mesh when rendering as point cloud or wireframe: `--keep_mesh` (used in the _Mesh + Depth_ example above)
 
 You can test you render settings using any of the `Blender` primitives (`monkey`, `cube`, `sphere`, `cone`, 
 `cylinder`, ...) as the first argument.
+
+Use `blenderproc run main.py` to see all available options and their descriptions.
 
 | Mesh                                     | Point cloud                   | Depth                                      |
 |------------------------------------------|-------------------------------|--------------------------------------------|
@@ -70,9 +73,9 @@ By default, the background is transparent. To change this, use the `--bg_color` 
 `--notransparent` can be used to render the backdrop object. To use HDRI images as backdrops, use `--backdrop path/to/hdri`.
 HDRIs can be obtained e.g. via `blenderproc download haven path/to/save/dir`.
 
-| Backdrop                       | Colored backdrop                      | HDRI backdrop                                                      |
-|--------------------------------|---------------------------------------|--------------------------------------------------------------------|
-| ![mesh](examples/backdrop.png) | ![pcd](examples/backdrop_colored.png) | ![mesh_depth](examples/hdri.png)                                   |
+| Backdrop                       | Colored backdrop                        | HDRI backdrop                               |
+|--------------------------------|-----------------------------------------|---------------------------------------------|
+| ![mesh](examples/backdrop.png) | ![pcd](examples/backdrop_colored.png)   | ![mesh_depth](examples/hdri.png)            |
 | `--notransparent`              | `--notransparent` `--bg_color pale_red` | `--notransparent` `--backdrop path/to/hdri` |
 
 ## Light
@@ -103,6 +106,16 @@ The default shading is `flat` for meshes and `smooth` for point clouds. To chang
 |------------------------------|----------------------------------|
 | ![mesh](examples/smooth.png) | ![pcd](examples/auto-smooth.png) |
 | `--shade smooth`             | `--shade auto`                   |
+
+### Wireframe
+
+To render the object as a wireframe, use the `--wireframe` option.
+The wireframe color can be changed using `--wireframe color` when `--keep_mesh` is specified.
+
+| Wireframe                       | Mesh + Wireframe                    | Mesh + Wireframe (Color)                         |
+|---------------------------------|-------------------------------------|--------------------------------------------------|
+| ![mesh](examples/wireframe.png) | ![pcd](examples/wireframe_mesh.png) | ![mesh_depth](examples/wireframe_mesh_color.png) |
+| `--wireframe`                   | `--wireframe` `--keep_mesh`         | `--wireframe red` `--keep_mesh`                  |
 
 ### Gravity
 
@@ -165,6 +178,8 @@ Some additional useful options include:
 * `--point_shape`: Change the shape of the points in the point cloud (`sphere`, `cube`, `diamond`)
 * `--verbose`: Enable verbose logging during execution
 * `--seed`: Set a seed for the random number generator. Useful for random colors or the tumble animation.
+
+Use `blenderproc run main.py` to see all available options and their descriptions.
 
 ## Debugging
 
