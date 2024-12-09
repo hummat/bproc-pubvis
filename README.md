@@ -1,6 +1,3 @@
----
----
-
 # [BlenderProc](https://github.com/DLR-RM/BlenderProc) Publication Visualization
 Publication-ready visualization of 3D objects and point clouds in seconds.
 
