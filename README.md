@@ -10,7 +10,7 @@ interactive version of this README!_
 
 ## Installation
 ```bash
-pip install bproc-pubvis
+pip install git+https://github.com/hummat/bproc-pubvis.git
 blenderproc pip install fire loguru
 ```
 
