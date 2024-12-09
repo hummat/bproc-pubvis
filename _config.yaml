@@ -1,3 +1,4 @@
+remote-theme: pages-themes/cayman
 plugins:
   - jekyll-seo-tag
 title: BlenderProc Publication Visualization
