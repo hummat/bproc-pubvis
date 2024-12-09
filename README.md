@@ -3,13 +3,13 @@
 <meta name="og:site_name" content="BlenderProc Publication Visualization" />
 <meta name="og:title" content="BlenderProc Publication Visualization" />
 <meta name="og:description" content="Publication-ready visualization of 3D objects and point clouds in seconds." />
-<meta name="og:image" content="https://hummat.github.io/bproc-pubvis/examples/mesh_depth.png" />
+<meta name="og:image" content="https://raw.githubusercontent.com/hummat/bproc-pubvis/refs/heads/gh-pages/examples/mesh_depth.png" />
 
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="https://hummat.github.io/bproc-pubvis" />
 <meta name="twitter:title" content="BlenderProc Publication Visualization" />
 <meta name="twitter:description" content="Publication-ready visualization of 3D objects and point clouds in seconds." />
-<meta name="twitter:image" content="https://hummat.github.io/bproc-pubvis/examples/mesh_depth.png" />
+<meta name="twitter:image" content="https://raw.githubusercontent.com/hummat/bproc-pubvis/refs/heads/gh-pages/examples/mesh_depth.png" />
 
 # [BlenderProc](https://github.com/DLR-RM/BlenderProc) Publication Visualization
 Publication-ready visualization of 3D objects and point clouds in seconds.
