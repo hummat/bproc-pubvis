@@ -5,7 +5,7 @@ Publication-ready visualization of 3D objects and point clouds in seconds.
 |----------------------------|--------------------------|----------------------------------------|
 | ![mesh](examples/mesh.png) | ![pcd](examples/pcd.png) | ![mesh_depth](examples/mesh_depth.png) |
 
-_Head over to the repository's [**GitHub** Pages site](https://hummat.com/bproc-pubvis) for a prettier and more
+_Head over to the repository's [**GitHub** Pages site](https://hummat.github.io/bproc-pubvis) for a prettier and more
 interactive version of this README!_
 
 ## Installation
