@@ -73,69 +73,69 @@ By default, the background is transparent. To change this, use the `--bg_color` 
 `--notransparent` can be used to render the backdrop object. To use HDRI images as backdrops, use `--backdrop path/to/hdri`.
 HDRIs can be obtained e.g. via `blenderproc download haven path/to/save/dir`.
 
-| Backdrop                       | Colored backdrop                        | HDRI backdrop                               |
-|--------------------------------|-----------------------------------------|---------------------------------------------|
-| ![mesh](examples/backdrop.png) | ![pcd](examples/backdrop_colored.png)   | ![mesh_depth](examples/hdri.png)            |
-| `--notransparent`              | `--notransparent` `--bg_color pale_red` | `--notransparent` `--backdrop path/to/hdri` |
+| Backdrop                           | Colored backdrop                           | HDRI backdrop                               |
+|------------------------------------|--------------------------------------------|---------------------------------------------|
+| ![backdrop](examples/backdrop.png) | ![bd_color](examples/backdrop_colored.png) | ![hdri](examples/hdri.png)                  |
+| `--notransparent`                  | `--notransparent` `--bg_color pale_red`    | `--notransparent` `--backdrop path/to/hdri` |
 
 ## Light
 
 The default light intensity for meshes is `bright` (`0.7`) and `very_bright` (`1.0`) for point clouds. Use a value 
 between 0 and 1 or `very_dark`, `dark`, `medium`, `bright`, or `very_bright` to change the light intensity.
 
-| Very Dark                       | Dark                      | Medium                             |
-|---------------------------------|---------------------------|------------------------------------|
-| ![mesh](examples/very_dark.png) | ![pcd](examples/dark.png) | ![mesh_depth](examples/medium.png) |
-| `--light very_dark`             | `--light dark`            | `--light medium`                   |
+| Very Dark                            | Dark                       | Medium                         |
+|--------------------------------------|----------------------------|--------------------------------|
+| ![very_dark](examples/very_dark.png) | ![dark](examples/dark.png) | ![medium](examples/medium.png) |
+| `--light very_dark`                  | `--light dark`             | `--light medium`               |
 
 ### Shadow
 
 Shadows are rendered by default. To disable them, use the `--noshadow` option. To make the shadow softer, use 
 `--shadow soft` or `--shadow=hard` for a harder shadow.
 
-| Soft shadow                       | Hard shadow                      | No shadow                            |
-|-----------------------------------|----------------------------------|--------------------------------------|
-| ![mesh](examples/shadow_soft.png) | ![pcd](examples/shadow_hard.png) | ![mesh_depth](examples/noshadow.png) |
-| `--shadow soft`                   | `--shadow hard`                  | `--noshadow`                         |
+| Soft shadow                       | Hard shadow                       | No shadow                           |
+|-----------------------------------|-----------------------------------|-------------------------------------|
+| ![soft](examples/shadow_soft.png) | ![hard](examples/shadow_hard.png) | ![no_shadow](examples/noshadow.png) |
+| `--shadow soft`                   | `--shadow hard`                   | `--noshadow`                        |
 
 ### Shading
 
 The default shading is `flat` for meshes and `smooth` for point clouds. To change this, use the `--shade` option.
 
-| Smooth shading               | Auto-smooth shading              |
-|------------------------------|----------------------------------|
-| ![mesh](examples/smooth.png) | ![pcd](examples/auto-smooth.png) |
-| `--shade smooth`             | `--shade auto`                   |
+| Flat shading (default)     | Smooth shading                 | Auto-smooth shading               |
+|----------------------------|--------------------------------|-----------------------------------|
+| ![flat](examples/mesh.png) | ![smooth](examples/smooth.png) | ![auto](examples/auto-smooth.png) |
+|                            | `--shade smooth`               | `--shade auto`                    |
 
 ### Wireframe
 
 To render the object as a wireframe, use the `--wireframe` option.
 The wireframe color can be changed using `--wireframe color` when `--keep_mesh` is specified.
 
-| Wireframe                       | Mesh + Wireframe                    | Mesh + Wireframe (Color)                         |
-|---------------------------------|-------------------------------------|--------------------------------------------------|
-| ![mesh](examples/wireframe.png) | ![pcd](examples/wireframe_mesh.png) | ![mesh_depth](examples/wireframe_mesh_color.png) |
-| `--wireframe`                   | `--wireframe` `--keep_mesh`         | `--wireframe red` `--keep_mesh`                  |
+| Wireframe                            | Mesh + Wireframe                        | Mesh + Wireframe (Color)                            |
+|--------------------------------------|-----------------------------------------|-----------------------------------------------------|
+| ![wireframe](examples/wireframe.png) | ![wf_mesh](examples/wireframe_mesh.png) | ![wf_mesh_color](examples/wireframe_mesh_color.png) |
+| `--wireframe`                        | `--wireframe` `--keep_mesh`             | `--wireframe red` `--keep_mesh`                     |
 
 ### Gravity
 
 Objects hover slightly above the ground by default. To change this, use the `--gravity` option to run quick physics
 simulation to let the object fall to the ground before rendering.
 
-| Default                    | With gravity                      |
-|----------------------------|-----------------------------------|
-| ![mesh](examples/mesh.png) | ![pcd](examples/gravity.png)      |
-|                            | `--gravity`                       |
+| Default                          | With gravity                     |
+|----------------------------------|----------------------------------|
+| ![no_gravity](examples/mesh.png) | ![gravity](examples/gravity.png) |
+|                                  | `--gravity`                      |
 
 ### Animations
 
 To create an animation, use the `--animate` option. The `--frames` option can be used to specify the number of frames
 (default: `72`). To keep transparency, which is not supported by GIF, use `.mp4` as file extension.
 
-| Turn (default, loops)      | Tumble                      |
-|----------------------------|-----------------------------|
-| ![mesh](examples/turn.gif) | ![pcd](examples/tumble.gif) |
-| `--animate`                | `--animate tubmle`          |
+| Turn (default, loops)      | Tumble                         |
+|----------------------------|--------------------------------|
+| ![turn](examples/turn.gif) | ![tumble](examples/tumble.gif) |
+| `--animate`                | `--animate tubmle`             |
 
 ### Interactive 3D Visualization
 
