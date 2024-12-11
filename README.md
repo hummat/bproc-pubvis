@@ -145,25 +145,25 @@ To provide an interactive 3D visualization, use `--export path/to/mesh.glb` to e
 use
 ```html
 <script 
-    type="module" 
-    src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
+  type="module" 
+  src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
 </script>
 
 <style>
 model-viewer {
-    width: 512px;
-    height: 512px;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
+  width: auto;
+  height: 300px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>
 
 <model-viewer 
-    src="path/to/mesh.glb" 
-    camera-controls tone-mapping="neutral" 
-    shadow-intensity="1" 
-    auto-rotate>
+  src="path/to/mesh.glb" 
+  camera-controls tone-mapping="neutral" 
+  shadow-intensity="1" 
+  auto-rotate>
 </model-viewer>
 ```
 in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.github.io/bproc-pubvis) of this repository) to display the object.
@@ -191,10 +191,12 @@ Adding `--debug` will further disable rendering and only set up the scene.
 ## Credits
 
 * [**BlenderProc 2**](https://github.com/DLR-RM/BlenderProc)
-<img src="https://user-images.githubusercontent.com/6104887/137109535-275a2aa3-f5fd-4173-9d16-a9a9b86f66e7.gif" alt="blenderproc" width="auto" height="300">
+
+<img src="https://user-images.githubusercontent.com/6104887/137109535-275a2aa3-f5fd-4173-9d16-a9a9b86f66e7.gif" alt="blenderproc" width="auto">
 
 * [**Blender**](https://www.blender.org)
-<img src="https://download.blender.org/branding/blender_logo_socket.png" alt="blender" width="auto" height="300">
+
+<img src="https://download.blender.org/branding/blender_logo_socket.png" alt="blender" width="auto">
 
 * [**Zheng et al.: Locally Attentional SDF Diffusion for Controllable 3D Shape Generation**](https://zhengxinyang.github.io/projects/LAS-Diffusion.html): Mesh colors and look
 * [**Yang et al.: PointFlow: 3D Point Cloud Generation with Continuous Normalizing Flows**](https://arxiv.org/abs/1906.12320): Point cloud color scheme and look
