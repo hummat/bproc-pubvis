@@ -58,9 +58,11 @@ Some examples of additional options to customize the rendering are shown below.
 
 To change the color of the rendered object, use the `--color` option using either any of the predefined colors (e.g. 
 `pale_violet`), choosing from those at random (`random_color`), a completely random color (`random`), or a three-tuple
-of RGB values in range 0-1, e.g `[0.8,0.5,0.2]`. Point clouds can additionally be colored using any of the 
-`matplotlib` [colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html). The background color can be
-changed using the `--bg_color` option.
+of RGB values in range 0-1, e.g `[0.8,0.5,0.2]`. Any of the 
+`matplotlib` [colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html) can be used as well.
+The background color can be changed using the `--bg_color` option.
+
+> Note: Make sure to use `--seed None` or a novel value for each run for random results.
 
 | Mesh                             | Point cloud                    | Background                           |
 |----------------------------------|--------------------------------|--------------------------------------|
