@@ -142,48 +142,50 @@ To provide an interactive 3D visualization, use `--export path/to/mesh.glb` to e
 use
 ```html
 <script 
-    type="module" 
-    src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
+  type="module" 
+  src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
 </script>
 
 <style>
 model-viewer {
-    width: auto;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
+  width: auto;
+  height: 300px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>
 
 <model-viewer 
-    src="path/to/mesh.glb" 
-    camera-controls tone-mapping="neutral" 
-    shadow-intensity="1" 
-    auto-rotate>
+  src="path/to/mesh.glb" 
+  camera-controls tone-mapping="neutral" 
+  shadow-intensity="1" 
+  auto-rotate>
 </model-viewer>
 ```
 in any HTML file to display the object:
 
 <script
-    type="module"
-    src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
+  type="module"
+  src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
 </script>
 
 <style>
-model-viewer {
-    width: auto;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
+model-viewer { 
+  width: auto;
+  height: 300px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 </style>
 
 <model-viewer
-    src="examples/suzanne.glb"
-    camera-controls
-    tone-mapping="neutral"
-    shadow-intensity="1"
-    auto-rotate>
+  src="examples/suzanne.glb"
+  camera-controls
+  tone-mapping="neutral"
+  shadow-intensity="1"
+  auto-rotate>
 </model-viewer>
 
 ### Further Options
