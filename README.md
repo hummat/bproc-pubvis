@@ -213,4 +213,4 @@ Adding `--debug` will further disable rendering and only set up the scene.
 <img src="https://download.blender.org/branding/blender_logo_socket.png" alt="blender" width="auto">
 
 * [**Zheng et al.: Locally Attentional SDF Diffusion for Controllable 3D Shape Generation**](https://zhengxinyang.github.io/projects/LAS-Diffusion.html): Mesh colors and look
-* [**Yang et al.: PointFlow: 3D Point Cloud Generation with Continuous Normalizing Flows**](https://arxiv.org/abs/1906.12320): Point cloud color scheme and look
+* [**Yang et al.: PointFlow: 3D Point Cloud Generation with Continuous Normalizing Flows**](https://www.guandaoyang.com/PointFlow): Point cloud color scheme and look
