@@ -8,6 +8,8 @@ Publication-ready visualization of 3D objects and point clouds in seconds.
 _Head over to the repository's [**GitHub** Pages site](https://hummat.github.io/bproc-pubvis) for a prettier and more
 interactive version of this README!_
 
+> **Design philosophy:** Following [Andrej Karpathy](https://github.com/karpathy) and KISS.
+
 ## Installation
 ```bash
 pip install git+https://github.com/hummat/bproc-pubvis.git
@@ -188,6 +190,11 @@ Adding `--debug` will further disable rendering and only set up the scene.
 
 ## Credits
 
-| [**BlenderProc 2**](https://github.com/DLR-RM/BlenderProc)                                                                                     | [**Blender**](https://www.blender.org)                                                              |
-|------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| <img src="https://user-images.githubusercontent.com/6104887/137109535-275a2aa3-f5fd-4173-9d16-a9a9b86f66e7.gif" alt="blenderproc" width="512"> | <img src="https://download.blender.org/branding/blender_logo_socket.png" alt="blender" widht="512"> | |
+* [**BlenderProc 2**](https://github.com/DLR-RM/BlenderProc)
+<img src="https://user-images.githubusercontent.com/6104887/137109535-275a2aa3-f5fd-4173-9d16-a9a9b86f66e7.gif" alt="blenderproc" width="auto" height="300">
+
+* [**Blender**](https://www.blender.org)
+<img src="https://download.blender.org/branding/blender_logo_socket.png" alt="blender" width="auto" height="300">
+
+* [**Zheng et al.: Locally Attentional SDF Diffusion for Controllable 3D Shape Generation**](https://zhengxinyang.github.io/projects/LAS-Diffusion.html): Mesh colors and look
+* [**Yang et al.: PointFlow: 3D Point Cloud Generation with Continuous Normalizing Flows**](https://arxiv.org/abs/1906.12320): Point cloud color scheme and look
