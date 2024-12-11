@@ -46,11 +46,12 @@ Use `blenderproc run main.py` to see all available options and their description
 ## Basic Options
 
 * `--resolution`: Change the resolution of the rendered image (default: `512x512`)
-* `--normalize`: Normalize and center the object to fit into a unit cube (`True` by default)
-* `--rotate`: Rotate the object using `XYZ` Euler angles in degrees (default: `0,0,-35`)
-* `--show`: Show the rendered image in a window (`True` if `--save` is not provided)
-* `--cam_location`: Set the camera location (default: `1.5,0,1`)
-* `--cam_offset`: By default, the camera looks at the origin (`0,0,0`). Use this option to change the look-at point.
+* `--center`: Center the object inside a unit cube (enabled by default)
+* `--scale`: Scale the object to fit into a unit cube (enabled by default)
+* `--rotate`: Rotate the object using `XYZ` Euler angles in degrees (default: `[0,0,-35]`)
+* `--show`: Show the rendered image in a window (enabled by default if `--save` is not provided)
+* `--cam_location`: Set the camera location (default: `[1.5,0,1]`)
+* `--cam_offset`: By default, the camera looks at the origin `[0,0,0]`. Use this option to change the look-at point.
 
 ## Additional Options
 
@@ -60,7 +61,7 @@ Some examples of additional options to customize the rendering are shown below.
 
 To change the color of the rendered object, use the `--color` option using either any of the predefined colors (e.g. 
 `pale_violet`), choosing from those at random (`random_color`), a completely random color (`random`), or a three-tuple
-of RGB values in range 0-1, e.g (`0.8,0.5,0.2`). Point clouds can additionally be colored using any of the 
+of RGB values in range 0-1, e.g `[0.8,0.5,0.2]`. Point clouds can additionally be colored using any of the 
 `matplotlib` [colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html). The background color can be
 changed using the `--bg_color` option.
 
