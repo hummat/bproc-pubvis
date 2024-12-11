@@ -141,10 +141,7 @@ To create an animation, use the `--animate` option. The `--frames` option can be
 To provide an interactive 3D visualization, use `--export path/to/mesh.glb` to export the object as a `.glb` file and
 use
 ```html
-<script 
-  type="module" 
-  src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
-</script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 
 <style>
 model-viewer {
@@ -165,10 +162,7 @@ model-viewer {
 ```
 in any HTML file to display the object:
 
-<script
-  type="module"
-  src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
-</script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
 
 <style>
 model-viewer { 
