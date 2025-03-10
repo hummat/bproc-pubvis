@@ -146,7 +146,7 @@ To create an animation, use the `--animate` option. The `--frames` option can be
 | Turn (default, loops)      | Tumble                         |
 |----------------------------|--------------------------------|
 | ![turn](examples/turn.gif) | ![tumble](examples/tumble.gif) |
-| `--animate`                | `--animate tubmle`             |
+| `--animate`                | `--animate tumble`             |
 
 ### Interactive 3D Visualization
 
