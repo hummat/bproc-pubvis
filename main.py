@@ -1,29 +1,41 @@
-import blenderproc as bproc
-
+import os
 import random
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union
+from typing import Any, Literal, Optional, Tuple, Union, cast
 
-import tyro
 import numpy as np
+import tyro
 from loguru import logger
 
 sys.path.append(str(Path(__file__).parent.absolute()))
-from src.constants import *
-from src.utils import *
+from src.constants import Animation, Color, Engine, Light, Look, Shading, Shadow, Shape, Strength
+from src.utils import (
+    add_ambient_occlusion,
+    export_obj,
+    init_renderer,
+    make_animation,
+    make_camera,
+    make_lights,
+    render_color,
+    render_depth,
+    set_look,
+    setup_backdrop,
+    setup_obj,
+)
 
 
 @dataclass
 class Config:
     """Creates and renders publication-ready visualizations of 3D meshes and point clouds.
-    
+
     This function serves as the main entry point for the bproc-pubvis library, handling
     the complete pipeline from loading 3D objects to final rendering. It supports both
     static renders and animations, with extensive customization options for materials,
     lighting, camera positioning, and rendering quality.
     """
+
     data: str | Path | Tuple[Path, Path]
     """Path to a single or two 3D object files (e.g. mesh + depth). Or name of BLender primitive."""
 
@@ -52,7 +64,7 @@ class Config:
     # Visualization options
     pcd: Union[bool, int] = False
     """Create a point cloud by sampling points from the surface of the mesh"""
-    depth: Union[Literal['ray_trace', 'z_buffer'], bool] = False
+    depth: Union[Literal["ray_trace", "z_buffer"], bool] = False
     """Visualize the given mesh as a (projected) depth map"""
     wireframe: Union[Tuple[float, float, float], Color, str, bool] = False
     """Whether to render the object as a wireframe"""
@@ -64,6 +76,10 @@ class Config:
     """Color for the points in RGB format"""
     point_shape: Optional[Union[Shape, str]] = None
     """Shape to use for point cloud visualization"""
+    subsample: Optional[int | float] = None
+    """Number of points or fraction to subsample the point cloud"""
+    subsample_method: Literal["random", "fps"] = "random"
+    """Subsampling strategy: 'random' for uniform random, 'fps' for farthest point sampling"""
 
     # Camera options
     cam_location: Tuple[float, float, float] = (1.5, 0, 1)
@@ -127,54 +143,78 @@ def run(cfg: Config):
     random.seed(cfg.seed)
     np.random.seed(cfg.seed)
     logger.remove()
-    logger.add(sys.stderr, level='INFO')
+    logger.add(sys.stderr, level="INFO")
     if cfg.verbose or cfg.debug:
-        logger.add(sys.stderr, level='DEBUG')
+        logger.add(sys.stderr, level="DEBUG")
 
-    init_renderer(resolution=cfg.resolution,
-                  transparent=cfg.transparent or cfg.bg_color is not None,
-                  look=cfg.look,
-                  exposure=cfg.exposure,
-                  engine=cfg.engine,
-                  noise_threshold=cfg.noise_threshold or 0.01,
-                  samples=cfg.samples or 100)
+    init_renderer(
+        resolution=cfg.resolution,
+        transparent=bool(cfg.transparent or cfg.bg_color is not None),
+        look=cfg.look,
+        exposure=cfg.exposure,
+        engine=cfg.engine,
+        noise_threshold=cfg.noise_threshold or 0.01,
+        samples=cfg.samples or 100,
+    )
 
-    animate = Animation.TURN if isinstance(cfg.animate, bool) and cfg.animate else Animation(
-        cfg.animate) if cfg.animate else None
+    animate = (Animation.TURN
+               if isinstance(cfg.animate, bool) and cfg.animate else Animation(cfg.animate) if cfg.animate else None)
     point_shape = Shape.SPHERE if animate in [Animation.TURN, Animation.TUMBLE] else cfg.point_shape
-    obj = setup_obj(obj_path=cfg.data,
-                    center=cfg.center,
-                    scale=cfg.scale,
-                    pcd=cfg.pcd if cfg.pcd > 1 else (cfg.pcd and not cfg.depth),
-                    wireframe=cfg.wireframe,
-                    keep_mesh=cfg.keep_mesh,
-                    set_material=not cfg.keep_material,
-                    color=cfg.color,
-                    cam_location=cfg.cam_location,
-                    roughness=cfg.roughness,
-                    point_shape=point_shape,
-                    rotate=cfg.rotate,
-                    shade=cfg.shade,
-                    point_size=cfg.point_size,
-                    point_color=cfg.point_color)
+    obj = setup_obj(
+        obj_path=cfg.data,
+        center=cfg.center,
+        scale=cfg.scale,
+        pcd=cfg.pcd if cfg.pcd > 1 else (cfg.pcd and not cfg.depth),
+        wireframe=cfg.wireframe,
+        keep_mesh=cfg.keep_mesh,
+        set_material=not cfg.keep_material,
+        color=cfg.color,
+        cam_location=cfg.cam_location,
+        roughness=cfg.roughness,
+        point_shape=point_shape,
+        rotate=cfg.rotate,
+        shade=cfg.shade,
+        point_size=cfg.point_size,
+        point_color=cfg.point_color,
+        subsample=cfg.subsample,
+        subsample_method=cfg.subsample_method,
+    )
 
     make_camera(obj=obj, location=cfg.cam_location, offset=cfg.cam_offset, fstop=cfg.fstop)
 
-    set_look(look=cfg.look, color=cfg.color, pcd=False if cfg.pcd > 1 else cfg.pcd, depth=True if cfg.depth else False)
+    pcd_for_look = False
+    if isinstance(cfg.pcd, bool):
+        pcd_for_look = cfg.pcd
+    elif isinstance(cfg.pcd, int):
+        pcd_for_look = cfg.pcd <= 1
+
+    set_look(
+        look=cfg.look,
+        color=cfg.color,
+        pcd=pcd_for_look,
+        depth=bool(cfg.depth),
+    )
+
+    default_show = cfg.save is None and not os.getenv("USE_EXTERNAL_BPY_MODULE")
+    should_show = cfg.show or default_show
 
     if cfg.depth:
-        obj = render_depth(obj=obj,
-                           pcd=cfg.pcd,
-                           keep_mesh=cfg.keep_mesh,
-                           color=cfg.color,
-                           cam_location=cfg.cam_location,
-                           roughness=cfg.roughness,
-                           point_shape=point_shape,
-                           point_size=cfg.point_size,
-                           bg_color=cfg.bg_color,
-                           ray_trace=cfg.depth != 'z_buffer',
-                           save=None if cfg.save is None else Path(cfg.save).resolve(),
-                           show=cfg.show or not cfg.save)
+        obj = render_depth(
+            obj=obj,
+            pcd=cfg.pcd,
+            keep_mesh=cfg.keep_mesh,
+            color=cfg.color,
+            cam_location=cfg.cam_location,
+            roughness=cfg.roughness,
+            point_shape=point_shape,
+            point_size=cfg.point_size,
+            subsample=cfg.subsample,
+            subsample_method=cfg.subsample_method,
+            bg_color=cfg.bg_color,
+            ray_trace=cfg.depth != "z_buffer",
+            save=Path(cfg.save).resolve() if cfg.save is not None else None,
+            show=should_show,
+        )
         if not obj:
             return
 
@@ -192,37 +232,47 @@ def run(cfg: Config):
             gravity = False
         offset = np.array([0, 0, -0.6])
 
-    light = cfg.light or Light.BRIGHT
-    logger.debug(f"Setting light intensity to {light}")
-    light = light if isinstance(light, float) else Light[light.upper()].value if isinstance(light, str) else light.value
+    base_light = cfg.light or Light.BRIGHT
+    logger.debug(f"Setting light intensity to {base_light}")
+    if isinstance(base_light, float):
+        light = base_light
+    elif isinstance(base_light, str):
+        light = Light[base_light.upper()].value
+    else:
+        light = cast(Any, base_light).value
     if gravity or cfg.backdrop:
-        setup_backdrop(obj=obj,
-                       shadow_strength=Strength.OFF if cfg.shadow == "off" else Strength.MEDIUM,
-                       transparent=cfg.transparent,
-                       color=None if cfg.transparent else cfg.bg_color,
-                       hdri_path=Path(cfg.backdrop).resolve() if isinstance(cfg.backdrop, str) else None,
-                       bg_light=cfg.bg_light * light,
-                       gravity=gravity,
-                       offset=offset)
+        setup_backdrop(
+            obj=obj,
+            shadow_strength=Strength.OFF if cfg.shadow == "off" else Strength.MEDIUM,
+            transparent=cfg.transparent,
+            color=None if cfg.transparent else cfg.bg_color,
+            hdri_path=Path(cfg.backdrop).resolve() if isinstance(cfg.backdrop, str) else None,
+            bg_light=cfg.bg_light * light,
+            gravity=gravity,
+            offset=offset,
+        )
 
     if cfg.ao or (cfg.ao is None and (is_mesh or cfg.depth)):
         ao = 0.5 if isinstance(cfg.ao, bool) or cfg.ao is None else cfg.ao
         logger.debug(f"Setting ambient occlusion strength to {ao}")
         add_ambient_occlusion(strength=ao)
 
-    shadow = Shadow(cfg.shadow) if cfg.shadow else (Shadow.MEDIUM if (is_mesh or cfg.depth) else Shadow.SOFT)
+    shadow = (Shadow(cfg.shadow) if cfg.shadow else (Shadow.MEDIUM if (is_mesh or cfg.depth) else Shadow.SOFT))
     logger.debug(f"Setting shadow type to {shadow}")
     make_lights(obj=obj, shadow=shadow, light_intensity=light)
 
-    if cfg.save:
-        cfg.save.parent.mkdir(parents=True, exist_ok=True)
+    save_path = Path(cfg.save).resolve() if cfg.save is not None else None
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
     if animate:
-        save = Path(animate.value).with_suffix('.gif') if not cfg.save else Path(cfg.save).resolve()
+        save = Path(animate.value).with_suffix(".gif") if save_path is None else save_path
         make_animation(obj=obj, save=save, animation=animate, bg_color=cfg.bg_color, debug=cfg.debug)
     elif not cfg.debug:
-        render_color(bg_color=cfg.bg_color,
-                     save=None if cfg.save is None else Path(cfg.save).resolve(),
-                     show=cfg.show or not cfg.save)
+        render_color(
+            bg_color=cfg.bg_color,
+            save=save_path,
+            show=should_show,
+        )
     if cfg.export:
         export_obj(obj=obj, path=Path(cfg.export).resolve())
 

@@ -13,6 +13,8 @@ interactive version of this README!_
 
 ## Installation
 
+### Standard (BlenderProc-managed Blender)
+
 ```bash
 pip install git+https://github.com/hummat/bproc-pubvis.git
 blenderproc pip install loguru tyro
@@ -21,6 +23,43 @@ blenderproc pip install loguru tyro
 The first call of `blenderproc` will download [`Blender`](https://blender.org). If you already have a local
 installation, you can use
 `--custom-blender-path path/to/blender` (this also needs to be used for all subsequent calls of `blenderproc`).
+
+### External `bpy` module (Python-only, no bundled Blender)
+
+This follows BlenderProc’s recommended setup for `USE_EXTERNAL_BPY_MODULE=1`:
+
+```bash
+python -m venv .venv          # or use `uv venv .venv`
+source .venv/bin/activate
+
+# Install BlenderProc + all external Blender deps (incl. bpy)
+pip install "bproc-pubvis[bpy_external] @ git+https://github.com/hummat/bproc-pubvis.git"
+```
+
+Then run with:
+
+```bash
+export USE_EXTERNAL_BPY_MODULE=1
+python main.py --data suzanne --save out.png
+```
+
+This mode requires **Python 3.11** (BlenderProc + `bpy==4.2.0` only ship wheels for CPython 3.11; 3.12 is not supported).
+
+#### External bpy tips & troubleshooting
+- Prefer using the BlenderProc source checkout (e.g. clone `../BlenderProc`) when `USE_EXTERNAL_BPY_MODULE=1`; the PyPI wheel rejects direct `python main.py` runs. If the checkout exists, `src/utils.py` automatically prepends it to `sys.path`.
+- Always set a writable temp directory: `export BPROC_TEMP_DIR=/tmp/bproc_temp` (avoids `/dev/shm` permission issues in some environments).
+- Expect one frame per render; if you ever see multiple frames, clear camera keyframes and set `frame_start=0`, `frame_end=1` (already done in `make_camera`).
+- To avoid GUI popups/segfaults when headless, omit `--show` (it is auto-disabled when `USE_EXTERNAL_BPY_MODULE=1` unless explicitly passed).
+
+## Development
+
+- Create the env once: `uv sync --group dev` (Python 3.11 only; downloads the ~500 MB `bpy` wheel).
+- Because the Linux `bpy==4.2.0` wheel is tagged `cp39`, `uv run` will otherwise uninstall/reinstall it on every sync. Run tools without syncing to avoid the churn:
+  - Lint: `uv run --no-sync ruff check .`
+  - Format: `uv run --no-sync ruff format .`
+  - Type check: `uv run --no-sync pyright`
+  - Tests: `uv run --no-sync pytest`
+- Re-run `uv sync --group dev` only when you intentionally want to refresh dependencies.
 
 ## Basic Usage
 
@@ -190,6 +229,25 @@ Some additional useful options include:
 * `--seed`: Set a seed for the random number generator. Useful for random colors or the tumble animation.
 
 Use `blenderproc run main.py` to see all available options and their descriptions.
+
+## Developer Setup
+
+This repository is `pyproject.toml`-based and works well with [`uv`](https://github.com/astral-sh/uv):
+
+```bash
+uv sync --group dev   # create .venv and install app + dev/bpy deps
+uv run ruff check .
+uv run pyright
+uv run pytest         # runs unit tests with coverage
+```
+
+Integration tests exercise a real BlenderProc + external `bpy` pipeline and are opt-in:
+
+```bash
+BPROC_INTEGRATION=1 uv run pytest tests/test_integration.py
+```
+
+See `AGENTS.md` for contributor-focused details (tooling, PR expectations, and how to run integration tests safely).
 
 ## Debugging
 

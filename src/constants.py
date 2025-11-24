@@ -24,52 +24,52 @@ class Strength(Enum):
 
 
 class Shading(Enum):
-    FLAT = 'flat'
-    SMOOTH = 'smooth'
-    AUTO = 'auto'
+    FLAT = "flat"
+    SMOOTH = "smooth"
+    AUTO = "auto"
 
 
 class Shape(Enum):
-    SPHERE = 'sphere'
-    CUBE = 'cube'
-    DIAMOND = 'diamond'
+    SPHERE = "sphere"
+    CUBE = "cube"
+    DIAMOND = "diamond"
 
 
 class Look(Enum):
-    VERY_LOW_CONTRAST = 'Very Low Contrast'
-    LOW_CONTRAST = 'Low Contrast'
-    MEDIUM_CONTRAST = 'Medium Contrast'
-    HIGH_CONTRAST = 'High Contrast'
-    VERY_HIGH_CONTRAST = 'Very High Contrast'
+    VERY_LOW_CONTRAST = "Very Low Contrast"
+    LOW_CONTRAST = "Low Contrast"
+    MEDIUM_CONTRAST = "Medium Contrast"
+    HIGH_CONTRAST = "High Contrast"
+    VERY_HIGH_CONTRAST = "Very High Contrast"
 
 
 class Shadow(Enum):
-    OFF = 'off'
-    VERY_HARD = 'very_hard'
-    HARD = 'hard'
-    MEDIUM = 'medium'
-    SOFT = 'soft'
-    VERY_SOFT = 'very_soft'
+    OFF = "off"
+    VERY_HARD = "very_hard"
+    HARD = "hard"
+    MEDIUM = "medium"
+    SOFT = "soft"
+    VERY_SOFT = "very_soft"
 
 
 class Engine(Enum):
-    CYCLES = 'cycles'
-    EEVEE = 'eevee'
+    CYCLES = "cycles"
+    EEVEE = "eevee"
 
 
 class Primitive(Enum):
-    SUZANNE = 'suzanne'
-    MONKEY = 'monkey'
-    CUBE = 'cube'
-    SPHERE = 'sphere'
-    CYLINDER = 'cylinder'
-    CONE = 'cone'
+    SUZANNE = "suzanne"
+    MONKEY = "monkey"
+    CUBE = "cube"
+    SPHERE = "sphere"
+    CYLINDER = "cylinder"
+    CONE = "cone"
 
 
 class Animation(Enum):
-    TURN = 'turn'
-    SWIVEL = 'swivel'
-    TUMBLE = 'tumble'
+    TURN = "turn"
+    SWIVEL = "swivel"
+    TUMBLE = "tumble"
 
 
 class Light(Enum):
