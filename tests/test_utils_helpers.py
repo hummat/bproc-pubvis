@@ -3,8 +3,8 @@ from typing import Sequence, Tuple, cast
 import numpy as np
 from PIL import Image
 
-from src.constants import Color
-from src.utils import (
+from bproc_pubvis.constants import Color
+from bproc_pubvis.utils import (
     _subsample_indices,
     _target_count,
     depth_to_image,

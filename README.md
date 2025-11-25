@@ -13,7 +13,7 @@ interactive version of this README!_
 
 ## Installation
 
-### Standard (BlenderProc-managed Blender)
+Use the BlenderProc-managed Blender (the only supported workflow):
 
 ```bash
 pip install git+https://github.com/hummat/bproc-pubvis.git
@@ -24,41 +24,14 @@ The first call of `blenderproc` will download [`Blender`](https://blender.org). 
 installation, you can use
 `--custom-blender-path path/to/blender` (this also needs to be used for all subsequent calls of `blenderproc`).
 
-### External `bpy` module (Python-only, no bundled Blender)
-
-This follows BlenderProc’s recommended setup for `USE_EXTERNAL_BPY_MODULE=1`:
-
-```bash
-python -m venv .venv          # or use `uv venv .venv`
-source .venv/bin/activate
-
-# Install BlenderProc + all external Blender deps (incl. bpy)
-pip install "bproc-pubvis[bpy_external] @ git+https://github.com/hummat/bproc-pubvis.git"
-```
-
-Then run with:
-
-```bash
-export USE_EXTERNAL_BPY_MODULE=1
-python main.py --data suzanne --save out.png
-```
-
-This mode requires **Python 3.11** (BlenderProc + `bpy==4.2.0` only ship wheels for CPython 3.11; 3.12 is not supported).
-
-#### External bpy tips & troubleshooting
-- Prefer using the BlenderProc source checkout (e.g. clone `../BlenderProc`) when `USE_EXTERNAL_BPY_MODULE=1`; the PyPI wheel rejects direct `python main.py` runs. If the checkout exists, `src/utils.py` automatically prepends it to `sys.path`.
-- Always set a writable temp directory: `export BPROC_TEMP_DIR=/tmp/bproc_temp` (avoids `/dev/shm` permission issues in some environments).
-- Expect one frame per render; if you ever see multiple frames, clear camera keyframes and set `frame_start=0`, `frame_end=1` (already done in `make_camera`).
-- To avoid GUI popups/segfaults when headless, omit `--show` (it is auto-disabled when `USE_EXTERNAL_BPY_MODULE=1` unless explicitly passed).
-
 ## Development
 
-- Create the env once: `uv sync --group dev` (Python 3.11 only; downloads the ~500 MB `bpy` wheel).
-- Because the Linux `bpy==4.2.0` wheel is tagged `cp39`, `uv run` will otherwise uninstall/reinstall it on every sync. Run tools without syncing to avoid the churn:
-  - Lint: `uv run --no-sync ruff check .`
-  - Format: `uv run --no-sync ruff format .`
-  - Type check: `uv run --no-sync pyright`
-  - Tests: `uv run --no-sync pytest`
+- Create the env once: `uv sync --group dev` (installs the app plus dev tools and `fake-bpy-module` stubs for local tests).
+- After any code change, run the full tooling suite:
+  - Format: `uv run ruff format .`
+  - Lint: `uv run ruff check .`
+  - Type check: `uv run pyright`
+  - Tests: `uv run pytest` (set `BPROC_INTEGRATION=1` to include integration tests)
 - Re-run `uv sync --group dev` only when you intentionally want to refresh dependencies.
 
 ## Basic Usage
@@ -77,16 +50,17 @@ The following options can be added to:
 * render the mesh as **depth** image: `--depth`
 * render the mesh as **point cloud** from projected **depth** image: `--pcd` `--depth`
 * keep the mesh when rendering as point cloud or wireframe: `--keep-mesh` (used in the _Mesh + Depth_ example above)
+* create an **animation**: `--animate` (use `--frames` for length, default `72`, and `--fps` for playback speed, default `20`)
 
 You can test you render settings using any of the `Blender` primitives (`monkey`, `cube`, `sphere`, `cone`,
 `cylinder`, ...) as the first argument.
 
-Use `blenderproc run main.py` to see all available options and their descriptions.
+Use `blenderproc run main.py -- --help` to see all available options and their descriptions (the `--` passes flags through BlenderProc to Tyro).
 
 | Mesh                                     | Point cloud                   | Depth                                      |
 |------------------------------------------|-------------------------------|--------------------------------------------|
 | ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png)      | ![mesh_depth](examples/depth.png)          |
-| `--path suzanne` (or just `suzanne`)     | `--pcd` `--light very_bright` | `--pcd 1024` `--point-size 0.01` `--depth` |
+| `suzanne` (primitive, positional)        | `--pcd` `--light very_bright` | `--pcd 1024` `--point-size 0.01` `--depth` `--keep-mesh` |
 
 ## Basic Options
 
@@ -110,23 +84,23 @@ of RGB values in range 0-1, e.g `0.8 0.5 0.2`. Any of the
 `matplotlib` [colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html) can be used as well.
 The background color can be changed using the `--bg-color` option.
 
-> Note: Make sure to use `--seed None` or a novel value for each run for random results.
+> Note: Use `--seed None` (or any changing integer) for non-deterministic results; default is `1337`.
 
 | Mesh                             | Point cloud                    | Background                           |
 |----------------------------------|--------------------------------|--------------------------------------|
 | ![mesh](examples/mesh_color.png) | ![pcd](examples/pcd_color.png) | ![mesh_depth](examples/bg_color.png) |
-| `--color bright-blue`            | `--pcd` `--color cool`         | `--bg-color pale_turquoise`          |
+| `--color bright_blue`            | `--pcd` `--color cool`         | `--bg-color pale_turquoise`          |
 
 ### Background
 
 By default, the background is transparent. To change this, use the `--bg-color` option as shown above. Additionally,
-`--notransparent` can be used to render the backdrop object. To use HDRI images as backdrops, use `--backdrop path/to/hdri`.
+set `--transparent False` to render the backdrop object. To use HDRI images as backdrops, use `--backdrop path/to/hdri`.
 HDRIs can be obtained e.g. via `blenderproc download haven path/to/save/dir`.
 
 | Backdrop                           | Colored backdrop                           | HDRI backdrop                               |
 |------------------------------------|--------------------------------------------|---------------------------------------------|
 | ![backdrop](examples/backdrop.png) | ![bd_color](examples/backdrop_colored.png) | ![hdri](examples/hdri.png)                  |
-| `--notransparent`                  | `--notransparent` `--bg-color pale_red`    | `--notransparent` `--backdrop path/to/hdri` |
+| `--transparent False`              | `--transparent False` `--bg-color pale_red`| `--transparent False` `--backdrop path/to/hdri` |
 
 ## Light
 
@@ -150,7 +124,7 @@ Shadows are rendered by default. To disable them, use the `--shadow off` option.
 
 ### Shading
 
-The default shading is `flat` for meshes and `smooth` for point clouds. To change this, use the `--shade` option.
+The default shading is `flat` for meshes. Use `--shade` to change mesh shading; point clouds are unaffected by this option.
 
 | Flat shading (default)     | Smooth shading                 | Auto-smooth shading               |
 |----------------------------|--------------------------------|-----------------------------------|
@@ -179,8 +153,7 @@ simulation to let the object fall to the ground before rendering.
 
 ### Animations
 
-To create an animation, use the `--animate` option. The `--frames` option can be used to specify the number of frames
-(default: `72`). To keep transparency, which is not supported by GIF, use `.mp4` as file extension.
+To create an animation, use the `--animate` option. Control length with `--frames` (default: `72`) and playback speed with `--fps` (default: `20`). To keep transparency, which is not supported by GIF, use `.mp4` as file extension.
 
 | Turn (default, loops)      | Tumble                         |
 |----------------------------|--------------------------------|
@@ -226,7 +199,12 @@ Some additional useful options include:
 * `--point-size`: Change the size of the points in the point cloud
 * `--point-shape`: Change the shape of the points in the point cloud (`sphere`, `cube`, `diamond`)
 * `--verbose`: Enable verbose logging during execution
-* `--seed`: Set a seed for the random number generator. Useful for random colors or the tumble animation.
+* `--seed`: Set a seed for the random number generator; use `None` to disable seeding.
+* `--subsample` / `--subsample-method {random,fps}`: Reduce point counts by a target number or fraction.
+* `--point-color`: Explicit point color when differing from mesh color.
+* `--bg-light`: Adjust background light intensity (default `0.15`).
+* `--look`, `--engine`, `--samples`, `--noise-threshold`, `--exposure`: Advanced render controls.
+* `--frames`, `--fps`: Animation length and playback speed.
 
 Use `blenderproc run main.py` to see all available options and their descriptions.
 
@@ -235,17 +213,31 @@ Use `blenderproc run main.py` to see all available options and their description
 This repository is `pyproject.toml`-based and works well with [`uv`](https://github.com/astral-sh/uv):
 
 ```bash
-uv sync --group dev   # create .venv and install app + dev/bpy deps
+uv sync --group dev   # create .venv and install app + dev deps
 uv run ruff check .
 uv run pyright
 uv run pytest         # runs unit tests with coverage
 ```
 
-Integration tests exercise a real BlenderProc + external `bpy` pipeline and are opt-in:
+Integration tests exercise the BlenderProc CLI end-to-end and are opt-in:
 
 ```bash
 BPROC_INTEGRATION=1 uv run pytest tests/test_integration.py
 ```
+
+To regenerate the README gallery assets with your GPU/HDRI set-up, run the gallery suite (writes into `examples/` by
+default). This is **opt-in** and separate from the basic integration flag:
+
+```bash
+BPROC_INTEGRATION=1 BPROC_EXAMPLES=1 \
+BPROC_HDRI_DIR=/path/to/haven/hdris \
+BPROC_EXAMPLES_OUT=examples \
+uv run pytest tests/test_integration.py -k readme_gallery
+```
+
+Optional env knobs:
+- `BPROC_README_RES` (default `512`) to change render resolution
+- `BPROC_README_FRAMES` (default `72`) to change animation length
 
 See `AGENTS.md` for contributor-focused details (tooling, PR expectations, and how to run integration tests safely).
 

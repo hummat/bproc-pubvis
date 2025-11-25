@@ -4,12 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bproc-pubvis"
-version = "0.1.0"
+version = "0.2.0"
 description = "Publication-ready visualization of 3D objects and point clouds in seconds."
-authors = [
-    {name = "Matthias Humt", email = "github.gizzard320@passmail.net"},
-]
-license = {text = "GPL-3.0"}
+authors = [{ name = "Matthias Humt", email = "github.gizzard320@passmail.net" }]
+license = { text = "GPL-3.0" }
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 classifiers = [
@@ -23,7 +21,9 @@ classifiers = [
 dependencies = [
     "blenderproc>=2.8.0",
     "loguru>=0.7.0",
+    "scipy>=1.13.1",
     "tyro>=0.8.0",
+    "trimesh>=4.4.0",
 ]
 
 [project.optional-dependencies]
@@ -34,27 +34,6 @@ dev = [
     "pyright>=1.1.385",
     "fake-bpy-module-4.2",
 ]
-bpy_external = [
-    "wheel",
-    "bpy==4.2.0",
-    "pyyaml==6.0.1",
-    "imageio==2.34.1",
-    "gitpython==3.1.43",
-    "scikit-image==0.23.2",
-    "pypng==0.20220715.0",
-    "scipy==1.13.1",
-    "matplotlib==3.9.0",
-    "pytz==2024.1",
-    "h5py==3.11.0",
-    "Pillow==10.3.0",
-    "opencv-contrib-python==4.10.*",
-    "scikit-learn==1.5.0",
-    "python-dateutil==2.9.0.post0",
-    "rich==13.7.1",
-    "trimesh==4.4.0",
-    "pyrender==0.1.45",
-    "PyQT5",
-]
 
 [dependency-groups]
 dev = [
@@ -62,25 +41,6 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.6.0",
     "pyright>=1.1.385",
-    "wheel",
-    "bpy==4.2.0",
-    "pyyaml==6.0.1",
-    "imageio==2.34.1",
-    "gitpython==3.1.43",
-    "scikit-image==0.23.2",
-    "pypng==0.20220715.0",
-    "scipy==1.13.1",
-    "matplotlib==3.9.0",
-    "pytz==2024.1",
-    "h5py==3.11.0",
-    "Pillow==10.3.0",
-    "opencv-contrib-python==4.10.*",
-    "scikit-learn==1.5.0",
-    "python-dateutil==2.9.0.post0",
-    "rich==13.7.1",
-    "trimesh==4.4.0",
-    "pyrender==0.1.45",
-    "PyQT5",
     "fake-bpy-module-4.2",
 ]
 
@@ -89,13 +49,19 @@ Homepage = "https://github.com/hummat/bproc-pubvis"
 Repository = "https://github.com/hummat/bproc-pubvis.git"
 "Bug Tracker" = "https://github.com/hummat/bproc-pubvis/issues"
 
+[tool.setuptools]
+
+[tool.setuptools.packages.find]
+include = ["bproc_pubvis"]
+exclude = ["output", "typings", "tests", "examples", "docs"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov --cov-report=term-missing"
 
 [tool.ruff]
 target-version = "py311"
-line-length = 100
+line-length = 120
 src = ["."]
 
 [tool.ruff.lint]
@@ -103,22 +69,28 @@ select = ["E", "F", "I", "B"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["constants", "utils"]
+known-first-party = ["bproc_pubvis"]
 
 [tool.pyright]
 include = ["."]
-exclude = ["__pycache__", ".git", ".venv", "src/utils.py"]
+exclude = [
+    "__pycache__",
+    ".git",
+    ".venv",
+    ".uv-cache",
+    ".cache",
+    "examples",
+    "docs",
+    "bproc_pubvis/utils.py",
+]
 pythonVersion = "3.11"
 typeCheckingMode = "basic"
 venvPath = "."
 venv = ".venv"
 reportMissingImports = "warning"
 reportMissingModuleSource = "warning"
+stubPath = "typings"
 
 [tool.coverage.run]
 source = ["."]
-omit = [
-    "tests/*",
-    "*/site-packages/*",
-    "__pycache__/*",
-]
+omit = ["tests/*", "*/site-packages/*", "__pycache__/*"]

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import sys
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-MAIN_PATH = PROJECT_ROOT / "main.py"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 
 def _import_main_with_stubbed_blenderproc() -> Any:
@@ -54,16 +55,8 @@ def _import_main_with_stubbed_blenderproc() -> Any:
         utility_module.stdout_redirected = _stdout_redirected  # type: ignore[attr-defined]
         sys.modules["blenderproc.python.utility.Utility"] = utility_module
 
-    spec = importlib.util.spec_from_file_location(
-        "bproc_pubvis_main",
-        MAIN_PATH,
-        submodule_search_locations=[str(PROJECT_ROOT)],
-    )
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["bproc_pubvis_main"] = module
-    spec.loader.exec_module(module)
-    return module
+    module = importlib.import_module("bproc_pubvis.main")
+    return importlib.reload(module)
 
 
 main = _import_main_with_stubbed_blenderproc()
@@ -82,9 +75,7 @@ class DummyObj:
         return DummyMesh(self._has_polygons)
 
 
-def _stub_pipeline(
-    monkeypatch: Any, obj: DummyObj, return_from_depth: DummyObj | None = None
-) -> dict[str, Any]:
+def _stub_pipeline(monkeypatch: Any, obj: DummyObj, return_from_depth: DummyObj | None = None) -> dict[str, Any]:
     calls: dict[str, Any] = {}
 
     def init_renderer(**kwargs: Any) -> None:

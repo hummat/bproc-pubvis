@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from src import constants  # type: ignore[import]
+from bproc_pubvis import constants  # type: ignore[import]
 
 
 def test_color_enum_has_white() -> None:

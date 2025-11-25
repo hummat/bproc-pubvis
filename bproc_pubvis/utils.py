@@ -1,38 +1,13 @@
 # pyright: ignorefile
 # ruff: noqa: E402
 
-import importlib.util
 import math
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import List, Literal, Optional, Tuple
 
-# Prefer local BlenderProc source when using external bpy (needed for integration tests)
-REPO_ROOT = Path(__file__).resolve().parent.parent
-BLENDERPROC_SRC = REPO_ROOT.parent / "BlenderProc"
-USE_EXTERNAL_BPY = os.getenv("USE_EXTERNAL_BPY_MODULE") == "1"
-if USE_EXTERNAL_BPY and BLENDERPROC_SRC.exists():
-    sys.path.insert(0, str(BLENDERPROC_SRC))
-
-# BlenderProc tries to remove its parent directory from sys.path when
-# USE_EXTERNAL_BPY_MODULE is set. When that parent is absent, it raises a
-# ValueError. Handle that gracefully without breaking stubbed modules in tests.
-if "blenderproc" in sys.modules:
-    import blenderproc as bproc  # type: ignore[reimported]  # noqa: E402
-else:
-    try:
-        import blenderproc as bproc  # noqa: E402
-    except ValueError as exc:  # triggered by sys.path.remove on missing entry
-        if "list.remove" not in str(exc):
-            raise
-        spec = importlib.util.find_spec("blenderproc")
-        if spec and spec.origin:
-            parent = Path(spec.origin).resolve().parent.parent
-            if str(parent) not in sys.path:
-                sys.path.insert(0, str(parent))
-        import blenderproc as bproc  # type: ignore[reimported]  # noqa: E402
+import blenderproc as bproc  # noqa: E402
 import bpy
 import matplotlib.pyplot as plt
 import numpy as np
@@ -219,19 +194,13 @@ def init_renderer(
         samples: The maximum number of samples for rendering.
     """
     # Allow overriding the base temporary directory for BlenderProc via env.
-    # When using external bpy, this controls where the internal `blender_proc_*`
-    # directories are created; useful in constrained environments or tests.
+    # Useful in constrained environments or tests.
     temp_dir_base = os.getenv("BPROC_TEMP_DIR")
-    if hasattr(bproc, "init"):
-        try:
-            bproc.init(temp_dir=temp_dir_base)
-        except TypeError:
-            # Older BlenderProc versions do not accept `temp_dir`; fall back.
-            bproc.init()
-    else:
-        logger.warning(
-            "blenderproc.init is unavailable; assuming external BPY is already initialized."
-        )
+    try:
+        bproc.init(temp_dir=temp_dir_base)
+    except TypeError:
+        # Older BlenderProc versions do not accept `temp_dir`; fall back.
+        bproc.init()
     if hasattr(bproc, "utility") and hasattr(bproc.utility, "set_keyframe_render_interval"):
         bproc.utility.set_keyframe_render_interval(frame_end=1)
 
@@ -249,9 +218,7 @@ def init_renderer(
                 denoiser_set = True
                 break
         if not denoiser_set:  # pragma: no cover - hardware/driver dependent
-            logger.warning(
-                "No supported denoiser (OPTIX/OPENIMAGEDENOISE); using Blender defaults."
-            )
+            logger.warning("No supported denoiser (OPTIX/OPENIMAGEDENOISE); using Blender defaults.")
         bproc.renderer.set_noise_threshold(noise_threshold)
         bproc.renderer.set_max_amount_of_samples(samples)
 
@@ -332,9 +299,7 @@ def setup_obj(
 
         if set_material or not obj.get_materials():
             material = obj.new_material(f"{'mesh' if is_mesh else 'pointcloud'}_material")
-            material.set_principled_shader_value(
-                "Roughness", roughness or (0.5 if is_mesh else 0.9)
-            )
+            material.set_principled_shader_value("Roughness", roughness or (0.5 if is_mesh else 0.9))
             set_color(
                 obj=obj,
                 color=c or (Color.PALE_GREEN if is_mesh else "pointflow"),
@@ -347,11 +312,17 @@ def setup_obj(
             if wireframe:
                 if keep_mesh:
                     wf_color = np.zeros(3) if isinstance(wireframe, bool) else get_color(wireframe)
+                    wf_color = np.asarray(wf_color).flatten()
+                    # Blender expects an RGB triple; guard against accidental RGBA/long vectors.
+                    if wf_color.size >= 4:
+                        wf_color = wf_color[:3]
+                    if wf_color.size == 0:
+                        wf_color = np.zeros(3)
                     wireframe = obj.duplicate()
                     wireframe.set_parent(obj)
                     wireframe.clear_materials()
                     material = wireframe.new_material("wireframe_material")
-                    material.set_principled_shader_value("Base Color", [*wf_color, 1])
+                    material.set_principled_shader_value("Base Color", [*wf_color.tolist(), 1])
                     material.set_principled_shader_value("Roughness", 0.9)
                     wireframe.add_modifier("WIREFRAME")
                     wireframe = get_modifier(wireframe, "Wireframe")
@@ -405,7 +376,7 @@ def load_data(
     """
     logger.debug(f"Loading object from {obj_path}")
     if not isinstance(obj_path, (str, Primitive)):
-        # Treat as tuple of paths
+        # Tuple input is expected as (mesh, depth/pcd); detect which entry has faces.
         obj_1_path, obj_2_path = obj_path  # type: ignore[misc]
         obj_1 = trimesh.load(str(obj_1_path), force="mesh")
         obj_2 = trimesh.load(str(obj_2_path), force="mesh")
@@ -448,6 +419,7 @@ def load_data(
                 apply_modifier(obj, "Bevel")
 
         geom = obj.mesh_as_trimesh()
+        # Rotate primitives so they face the default camera orientation used by BlenderProc.
         geom.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 0, 1]))
         obj.delete()
     elif isinstance(obj_path, (str, Path)) and Path(obj_path).suffix == ".blend":
@@ -539,7 +511,6 @@ def get_color(
             return np.random.choice(list(Color)).value
     if isinstance(color, Color):
         return color.value
-    # At this point, `color` should be a 3-tuple; trust caller.
     return color  # type: ignore[return-value]
 
 
@@ -586,7 +557,7 @@ def set_color(
             for dist in distances:
                 colors.append(cmap(dist))
 
-        # TODO: Is this possible with BlenderProc, i.e. obj.new_attribute?
+        # BlenderProc lacks a helper for creating color attributes, so set the raw mesh attribute.
         mesh = obj.get_mesh()
         color_attr_name = "point_color"
         mesh.attributes.new(name=color_attr_name, type="FLOAT_COLOR", domain="POINT")
@@ -669,9 +640,8 @@ def setup_backdrop(
     if hdri_path:
         resolved_hdri = hdri_path
         if (resolved_hdri / "hdri").exists():
-            resolved_hdri = bproc.loader.get_random_world_background_hdr_img_path_from_haven(
-                str(resolved_hdri)
-            )
+            # Allow passing a HAVEN dataset root instead of a single HDR file.
+            resolved_hdri = bproc.loader.get_random_world_background_hdr_img_path_from_haven(str(resolved_hdri))
         logger.debug(f"Setting HDRI backdrop to {Path(resolved_hdri).stem}")
         bproc.world.set_world_background_hdr_img(str(resolved_hdri), strength=bg_light)
         if gravity:
@@ -725,9 +695,7 @@ def make_obj(mesh_or_pcd: Trimesh | PointCloud) -> bproc.types.MeshObject:
     Returns:
         The created BlenderProc mesh object.
     """
-    obj = bproc.object.create_with_empty_mesh(
-        "mesh" if hasattr(mesh_or_pcd, "faces") else "pointcloud"
-    )
+    obj = bproc.object.create_with_empty_mesh("mesh" if hasattr(mesh_or_pcd, "faces") else "pointcloud")
     obj.get_mesh().from_pydata(mesh_or_pcd.vertices, [], getattr(mesh_or_pcd, "faces", []))
     obj.get_mesh().validate()
     obj.persist_transformation_into_mesh()
@@ -773,9 +741,7 @@ def init_mesh(obj: bproc.types.MeshObject, shade: Shading | str = Shading.FLAT):
     obj.set_shading_mode(Shading(shade).name)
 
 
-def _pointcloud_with_geometry_nodes(
-    links, nodes, set_material_node=None, point_size: float = 0.004
-):
+def _pointcloud_with_geometry_nodes(links, nodes, set_material_node=None, point_size: float = 0.004):
     """Sets up a point cloud using geometry nodes.
 
     This function configures a point cloud in Blender using geometry nodes. It converts a mesh to points
@@ -826,9 +792,7 @@ def _pointcloud_with_geometry_nodes_and_instances(
         mesh_node.inputs["Radius"].default_value = point_size
         set_shade_smooth_node = nodes.new("GeometryNodeSetShadeSmooth")
         links.new(mesh_node.outputs["Mesh"], set_shade_smooth_node.inputs["Geometry"])
-        links.new(
-            set_shade_smooth_node.outputs["Geometry"], instance_on_points_node.inputs["Instance"]
-        )
+        links.new(set_shade_smooth_node.outputs["Geometry"], instance_on_points_node.inputs["Instance"])
     elif Shape(point_shape) is Shape.CUBE:
         mesh_node = nodes.new("GeometryNodeMeshCube")
         mesh_node.inputs["Size"].default_value = [np.sqrt(2 * point_size**2)] * 3
@@ -844,13 +808,9 @@ def _pointcloud_with_geometry_nodes_and_instances(
 
     group_output_node = Utility.get_the_one_node_with_type(nodes, "NodeGroupOutput")
     if set_material_node is None:
-        links.new(
-            instance_on_points_node.outputs["Instances"], group_output_node.inputs["Geometry"]
-        )
+        links.new(instance_on_points_node.outputs["Instances"], group_output_node.inputs["Geometry"])
     else:
-        links.new(
-            instance_on_points_node.outputs["Instances"], set_material_node.inputs["Geometry"]
-        )
+        links.new(instance_on_points_node.outputs["Instances"], set_material_node.inputs["Geometry"])
         links.new(set_material_node.outputs["Geometry"], group_output_node.inputs["Geometry"])
 
 
@@ -966,9 +926,7 @@ def init_pointcloud(
         )
 
 
-def add_ambient_occlusion(
-    obj: Optional[bproc.types.MeshObject] = None, distance: float = 0.2, strength: float = 0.5
-):
+def add_ambient_occlusion(obj: Optional[bproc.types.MeshObject] = None, distance: float = 0.2, strength: float = 0.5):
     """Adds ambient occlusion to the Blender scene or a specific object.
 
     If no object is provided, it configures the scene to use ambient occlusion
@@ -1027,9 +985,7 @@ def add_ambient_occlusion(
                 bsdf_node.inputs["Base Color"],
             )
         except RuntimeError:
-            ao_node.inputs["Color"].default_value = material.get_principled_shader_value(
-                "Base Color"
-            )
+            ao_node.inputs["Color"].default_value = material.get_principled_shader_value("Base Color")
             material.set_principled_shader_value("Base Color", ao_node.outputs["Color"])
 
 
@@ -1054,9 +1010,7 @@ def make_lights(
     """
     key_light = bproc.types.Light("AREA", name="key_light")
     key_light.set_location([1, 0.5, 2])
-    key_light.set_rotation_mat(
-        bproc.camera.rotation_from_forward_vec(obj.get_location() - key_light.get_location())
-    )
+    key_light.set_rotation_mat(bproc.camera.rotation_from_forward_vec(obj.get_location() - key_light.get_location()))
     scale = 1
     if Shadow(shadow) is Shadow.VERY_HARD:
         scale = 0.01
@@ -1114,9 +1068,7 @@ def make_camera(
     bpy.context.scene.frame_end = bpy.context.scene.frame_start + 1
     if fstop:
         focal_distance = np.linalg.norm(obj.mesh_as_trimesh().vertices - location, axis=1).min()
-        bproc.camera.add_depth_of_field(
-            focal_point_obj=None, fstop_value=fstop, focal_distance=focal_distance
-        )
+        bproc.camera.add_depth_of_field(focal_point_obj=None, fstop_value=fstop, focal_distance=focal_distance)
 
 
 def normalize(values: np.ndarray, a: float = 0, b: float = 1) -> np.ndarray:
@@ -1261,6 +1213,7 @@ def render_depth(
         mesh = obj
         resolution = get_camera_resolution()
 
+        # Temporarily render depth at low resolution to keep sampling fast, then restore.
         bproc.camera.set_resolution(128, 128)
         depth = get_depth()
         points = bproc.camera.pointcloud_from_depth(depth).reshape(-1, 3)
@@ -1374,6 +1327,7 @@ def make_animation(
         if animation is Animation.SWIVEL:
             pivot = bproc.object.create_empty("pivot")
             pivot.set_location(obj.get_location())
+            # Parent camera and lights to pivot so they orbit with the swivel instead of staying static.
             get_camera().set_parent(pivot)
             for light in get_all_light_objects():
                 light.set_parent(pivot)
