@@ -201,11 +201,12 @@ def run(cfg: Config):
         else None
     )
     point_shape = Shape.SPHERE if animate in [Animation.TURN, Animation.TUMBLE] else cfg.point_shape
+    pcd_setup = False if cfg.depth else (cfg.pcd if isinstance(cfg.pcd, int) and cfg.pcd > 1 else cfg.pcd)
     obj = setup_obj(
         obj_path=cfg.data,
         center=cfg.center,
         scale=cfg.scale,
-        pcd=cfg.pcd if cfg.pcd > 1 else (cfg.pcd and not cfg.depth),
+        pcd=pcd_setup,
         wireframe=cfg.wireframe,
         keep_mesh=cfg.keep_mesh,
         set_material=not cfg.keep_material,

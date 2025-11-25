@@ -1381,7 +1381,6 @@ def make_animation(
         images = render_color(
             bg_color=bg_color or Color.WHITE if save.suffix == ".gif" else bg_color,
         )
-        images[0].save(save.with_suffix(".png"))
 
         if save.suffix == ".gif":
             images[0].save(
