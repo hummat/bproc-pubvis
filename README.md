@@ -166,7 +166,7 @@ To provide an interactive 3D visualization, use `--export path/to/mesh.glb` to e
 use
 
 ```html
-<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.1.0/model-viewer.min.js"></script>
 
 <style>
 model-viewer {
@@ -186,7 +186,26 @@ model-viewer {
 </model-viewer>
 ```
 
-in any HTML file (like the hosted [**GitHub** Pages site](https://hummat.github.io/bproc-pubvis) of this repository) to display the object.
+in any HTML file to display the object:
+
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.1.0/model-viewer.min.js"></script>
+
+<style>
+model-viewer {
+  width: auto;
+  height: 300px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+<model-viewer
+  src="examples/suzanne.glb"
+  camera-controls tone-mapping="neutral"
+  shadow-intensity="1"
+  auto-rotate>
+</model-viewer>
 
 ### Further Options
 
