@@ -198,6 +198,7 @@ Some additional useful options include:
 * `--keep-material`: Keep your custom material (only works for `.blend` files)
 * `--point-size`: Change the size of the points in the point cloud
 * `--point-shape`: Change the shape of the points in the point cloud (`sphere`, `cube`, `diamond`)
+* `--outline` / `--outline-width`: Add a geometry-based outline around the mesh and control its thickness (mesh-only; disabled for depth renders).
 * `--verbose`: Enable verbose logging during execution
 * `--seed`: Set a seed for the random number generator; use `None` to disable seeding.
 * `--subsample` / `--subsample-method {random,fps}`: Reduce point counts by a target number or fraction.

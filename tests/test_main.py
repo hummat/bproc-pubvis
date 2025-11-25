@@ -144,6 +144,20 @@ def test_run_static_render(tmp_path: Path, monkeypatch: Any) -> None:
     assert "make_animation" not in calls
 
 
+def test_run_static_render_with_outline(tmp_path: Path, monkeypatch: Any) -> None:
+    obj = DummyObj(has_polygons=True)
+    calls = _stub_pipeline(monkeypatch, obj)
+
+    save_path = tmp_path / "static_outline.png"
+    cfg = main.Config(data="suzanne", save=save_path, show=False, depth=False, outline=True)
+
+    main.run(cfg)
+
+    assert "setup_obj" in calls
+    assert calls["setup_obj"]["outline"] is True
+    assert calls["setup_obj"]["outline_width"] is None
+
+
 def test_run_depth_to_pcd_with_gravity_and_backdrop(tmp_path: Path, monkeypatch: Any) -> None:
     obj = DummyObj(has_polygons=True)
     # depth rendering returns the same object so the rest of the pipeline can continue
@@ -171,6 +185,26 @@ def test_run_depth_to_pcd_with_gravity_and_backdrop(tmp_path: Path, monkeypatch:
     assert "setup_backdrop" in calls
     # lights configured
     assert "make_lights" in calls
+
+
+def test_run_depth_disables_outline(tmp_path: Path, monkeypatch: Any) -> None:
+    obj = DummyObj(has_polygons=True)
+    calls = _stub_pipeline(monkeypatch, obj, return_from_depth=obj)
+
+    save_path = tmp_path / "depth_outline.png"
+    cfg = main.Config(
+        data="suzanne",
+        depth="ray_trace",
+        outline=True,
+        save=save_path,
+        show=False,
+    )
+
+    main.run(cfg)
+
+    # outline should be disabled when depth visualization is requested
+    assert "setup_obj" in calls
+    assert calls["setup_obj"]["outline"] is False
 
 
 def test_run_animation_turn(monkeypatch: Any, tmp_path: Path) -> None:

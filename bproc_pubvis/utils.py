@@ -253,6 +253,8 @@ def setup_obj(
     scale: bool | float = True,
     pcd: bool | int = False,
     wireframe: Tuple[float, float, float] | Color | str | bool = False,
+    outline: Tuple[float, float, float] | Color | str | bool = False,
+    outline_width: Optional[float] = None,
     keep_mesh: bool = False,
     set_material: bool = True,
     color: Optional[Tuple[float, float, float] | Color | str] = None,
@@ -278,6 +280,8 @@ def setup_obj(
         scale: Whether to normalize the object to fit within a unit cube
         pcd: Whether transform the mesh into a point cloud by sampling points from the surface
         wireframe: Whether to render the object as a wireframe
+        outline: Whether to render a geometry-based outline around the mesh
+        outline_width: Thickness of the outline in Blender units (optional)
         keep_mesh: Whether to keep the mesh object after creating the point cloud
         set_material: Whether to set a material for the object
         color: The color to apply to the object
@@ -352,6 +356,12 @@ def setup_obj(
                     wireframe = get_modifier(obj, "Wireframe")
                     wireframe.thickness = 0.05
                 wireframe.use_relative_offset = True
+            if outline:
+                add_outline(
+                    obj=obj,
+                    outline=outline,
+                    width=outline_width,
+                )
         else:
             init_pointcloud(obj=obj, point_size=point_size, point_shape=point_shape)
         objs.append(obj)
@@ -532,6 +542,106 @@ def get_color(
     if isinstance(color, Color):
         return color.value
     return color  # type: ignore[return-value]
+
+
+def add_outline(
+    obj: bproc.types.MeshObject,
+    outline: Tuple[float, float, float] | Color | str | bool = True,
+    width: Optional[float] = None,
+) -> None:
+    """Adds a geometry-based outline shell around a mesh object.
+
+    The outline uses a scaled duplicate of the mesh with an outline material that
+    renders only backfaces (via alpha driven by the `Backfacing` socket). This keeps
+    the original mesh fully visible while the duplicate contributes a rim at the
+    silhouette. Only applied to mesh objects; point clouds are ignored.
+    """
+    mesh = obj.get_mesh()
+    if not mesh.polygons:
+        logger.warning("Outline requested for non-mesh object; skipping.")
+        return
+
+    if isinstance(outline, bool):
+        color_spec: Tuple[float, float, float] | Color | str = Color.BLACK
+    else:
+        color_spec = outline
+
+    rgb = np.asarray(get_color(color_spec)).flatten()
+    if rgb.size >= 4:
+        rgb = rgb[:3]
+    if rgb.size == 0:
+        rgb = np.zeros(3)
+
+    # Line Art via Grease Pencil (screen-space outline).
+    stroke_thickness = _outline_thickness_px(width)
+
+    scene = bpy.context.scene
+    # Create or reuse a GP object dedicated to outlines.
+    gp_data = bpy.data.grease_pencils.new("outline_gp")
+    gp_obj = bpy.data.objects.new("outline_gp_obj", gp_data)
+    scene.collection.objects.link(gp_obj)
+
+    # Ensure a layer exists.
+    if not gp_data.layers:
+        gp_layer = gp_data.layers.new(name="OutlineLayer")
+    else:
+        gp_layer = gp_data.layers[0]
+    gp_layer.line_change = 0
+
+    # GP material for strokes.
+    gp_mat = bpy.data.materials.new("outline_gp_mat")
+    gp_settings = getattr(gp_mat, "grease_pencil", None)
+    if gp_settings is None:
+        logger.warning("Grease Pencil material settings not available; skipping outline.")
+        return
+    gp_settings.show_stroke = True
+    gp_settings.show_fill = False
+    gp_mat.diffuse_color = (*rgb.tolist(), 1)
+    gp_data.materials.append(gp_mat)
+
+    # Line Art modifier on the GP object.
+    try:
+        la_mod = gp_obj.grease_pencil_modifiers.new(name="LineArt", type="LINEART")
+    except AttributeError:
+        logger.warning("Grease Pencil Line Art not available in this Blender version; skipping outline.")
+        return
+
+    la_mod.target = obj.blender_obj
+    la_mod.use_contour = True
+    la_mod.use_material_border = False
+    la_mod.use_intersection = False
+    la_mod.use_edge_marks = False
+    la_mod.use_crease = False
+    la_mod.use_loose = False
+    la_mod.thickness = stroke_thickness
+    la_mod.opacity = 1.0
+    la_mod.source_type = "OBJECT"
+    la_mod.overscan = 0
+    la_mod.level_start = 0
+    la_mod.level_end = 0
+    la_mod.use_remove_doubles = True
+    la_mod.use_offset = False
+    la_mod.thickness_position = "RELATIVE"
+    la_mod.material = gp_mat
+
+    # Ensure GP is rendered in front and does not cast shadows.
+    gp_obj.display_type = "WIRE"
+    gp_obj.hide_render = False
+    gp_data.stroke_thickness_space = "VIEW"
+    gp_data.pixel_factor = 1.0
+
+
+def _outline_thickness_px(width: Optional[float]) -> float:
+    """Map outline width (world-ish) to a reasonable stroke thickness in pixels."""
+    if width is None:
+        return 2.0
+    try:
+        w = float(width)
+        if w <= 0:
+            return 2.0
+        return max(0.1, w * 100)
+    except Exception:
+        return 2.0
 
 
 def set_color(

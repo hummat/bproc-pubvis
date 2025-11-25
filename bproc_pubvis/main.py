@@ -71,6 +71,10 @@ class Config:
     """Visualize the given mesh as a (projected) depth map"""
     wireframe: Union[Tuple[float, float, float], Color, str, bool] = False
     """Whether to render the object as a wireframe"""
+    outline: Union[Tuple[float, float, float], Color, str, bool] = False
+    """Whether to render a geometry-based outline around the mesh"""
+    outline_width: Optional[float] = None
+    """Thickness of the outline in Blender units (default chosen automatically)"""
     keep_mesh: bool = False
     """Whether to keep the mesh object after creating the point cloud"""
     point_size: Optional[float] = None
@@ -168,10 +172,12 @@ class Config:
         self.pcd = _intish(_boolish(self.pcd))
         self.depth = _boolish(self.depth)
         self.wireframe = _boolish(self.wireframe)
+        self.outline = _boolish(self.outline)
         self.animate = _boolish(self.animate)
         self.backdrop = _boolish(self.backdrop)
         self.transparent = _boolish(self.transparent)
         self.light = _floatish(self.light) if self.light is not None else None
+        self.outline_width = _floatish(self.outline_width)
 
 
 def run(cfg: Config):
@@ -202,12 +208,20 @@ def run(cfg: Config):
     )
     point_shape = Shape.SPHERE if animate in [Animation.TURN, Animation.TUMBLE] else cfg.point_shape
     pcd_setup = False if cfg.depth else (cfg.pcd if isinstance(cfg.pcd, int) and cfg.pcd > 1 else cfg.pcd)
+    outline_for_setup = cfg.outline
+    if cfg.depth and outline_for_setup:
+        logger.warning(
+            "Outline is currently only supported for mesh renders; disabling outline for depth visualizations."
+        )
+        outline_for_setup = False
     obj = setup_obj(
         obj_path=cfg.data,
         center=cfg.center,
         scale=cfg.scale,
         pcd=pcd_setup,
         wireframe=cfg.wireframe,
+        outline=outline_for_setup,
+        outline_width=cfg.outline_width,
         keep_mesh=cfg.keep_mesh,
         set_material=not cfg.keep_material,
         color=cfg.color,

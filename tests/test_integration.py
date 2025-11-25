@@ -40,6 +40,7 @@ EXAMPLES: list[tuple[str, str, list[str]]] = [
     ("wireframe_mesh", "png", ["--wireframe", "True", "--keep-mesh"]),
     ("wireframe_mesh_white", "png", ["--wireframe", "white", "--keep-mesh"]),
     ("wireframe_mesh_color", "png", ["--wireframe", "red", "--keep-mesh"]),
+    ("outline", "png", ["--outline", "True"]),
     ("gravity", "png", ["--gravity"]),
     ("turn", "gif", ["--animate", "turn"]),
     ("tumble", "gif", ["--animate", "tumble"]),

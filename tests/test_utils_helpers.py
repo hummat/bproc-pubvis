@@ -5,6 +5,7 @@ from PIL import Image
 
 from bproc_pubvis.constants import Color
 from bproc_pubvis.utils import (
+    _outline_thickness_px,
     _subsample_indices,
     _target_count,
     depth_to_image,
@@ -76,3 +77,9 @@ def test_get_color_and_background_composite():
     res_pixels = list(pixels_raw)
     assert res_pixels[0] == (255, 0, 0, 255)  # filled from background color
     assert res_pixels[1] == (0, 0, 0, 255)  # original opaque pixel preserved
+
+
+def test_outline_thickness_mapping():
+    assert _outline_thickness_px(None) == 2.0
+    assert _outline_thickness_px(0.01) == 1.0  # 0.01 * 100
+    assert _outline_thickness_px(0) == 2.0  # falls back to default when <= 0
