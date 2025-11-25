@@ -4,14 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bproc-pubvis"
-version = "0.1.0"
+version = "0.2.0"
 description = "Publication-ready visualization of 3D objects and point clouds in seconds."
-authors = [
-    {name = "Matthias Humt", email = "github.gizzard320@passmail.net"},
-]
-license = {text = "GPL-3.0"}
+authors = [{ name = "Matthias Humt", email = "github.gizzard320@passmail.net" }]
+license = { text = "GPL-3.0" }
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -21,10 +19,78 @@ classifiers = [
 ]
 
 dependencies = [
-    "blenderproc>=2.8.0"
+    "blenderproc>=2.8.0",
+    "loguru>=0.7.0",
+    "scipy>=1.13.1",
+    "tyro>=0.8.0",
+    "trimesh>=4.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.6.0",
+    "pyright>=1.1.385",
+    "fake-bpy-module-4.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.6.0",
+    "pyright>=1.1.385",
+    "fake-bpy-module-4.2",
 ]
 
 [project.urls]
 Homepage = "https://github.com/hummat/bproc-pubvis"
 Repository = "https://github.com/hummat/bproc-pubvis.git"
 "Bug Tracker" = "https://github.com/hummat/bproc-pubvis/issues"
+
+[tool.setuptools]
+
+[tool.setuptools.packages.find]
+include = ["bproc_pubvis"]
+exclude = ["output", "typings", "tests", "examples", "docs"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov --cov-report=term-missing"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["."]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bproc_pubvis"]
+
+[tool.pyright]
+include = ["."]
+exclude = [
+    "__pycache__",
+    ".git",
+    ".venv",
+    ".uv-cache",
+    ".cache",
+    "examples",
+    "docs",
+    "bproc_pubvis/utils.py",
+]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+reportMissingImports = "warning"
+reportMissingModuleSource = "warning"
+stubPath = "typings"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["tests/*", "*/site-packages/*", "__pycache__/*"]
