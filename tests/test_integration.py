@@ -20,7 +20,7 @@ BLENDERPROC_BIN = shutil.which(os.getenv("BLENDERPROC_BIN", "blenderproc"))
 EXAMPLES: list[tuple[str, str, list[str]]] = [
     ("mesh", "png", []),
     ("pcd", "png", ["--pcd", "True", "--light", "very_bright"]),
-    ("mesh_depth", "png", ["--depth", "ray_trace", "--pcd", "True", "--keep-mesh", "--point-size", "0.01"]),
+    ("mesh_depth", "png", ["--depth", "ray_trace", "--pcd", "1024", "--keep-mesh", "--point-size", "0.01"]),
     ("depth", "png", ["--depth", "ray_trace", "--pcd", "True", "--point-size", "0.01"]),
     ("mesh_color", "png", ["--color", "bright_blue"]),
     ("pcd_color", "png", ["--pcd", "True", "--color", "cool"]),
@@ -37,7 +37,7 @@ EXAMPLES: list[tuple[str, str, list[str]]] = [
     ("smooth", "png", ["--shade", "smooth"]),
     ("auto-smooth", "png", ["--shade", "auto"]),
     ("wireframe", "png", ["--wireframe", "True"]),
-    ("wireframe_mesh", "png", ["--wireframe", "0", "0", "0", "--keep-mesh"]),
+    ("wireframe_mesh", "png", ["--wireframe", "True", "--keep-mesh"]),
     ("wireframe_mesh_white", "png", ["--wireframe", "white", "--keep-mesh"]),
     ("wireframe_mesh_color", "png", ["--wireframe", "red", "--keep-mesh"]),
     ("gravity", "png", ["--gravity"]),
@@ -52,7 +52,9 @@ def _require_blenderproc_bin() -> None:
         pytest.skip("blenderproc binary not found in PATH; set BLENDERPROC_BIN or adjust PATH.")
 
 
-def _run_main_with_blenderproc(tmp_path: Path, extra_args: list[str], resolution: int = 64) -> subprocess.CompletedProcess[str]:
+def _run_main_with_blenderproc(
+    tmp_path: Path, extra_args: list[str], resolution: int = 64
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["BPROC_TEMP_DIR"] = str(tmp_path)
 
@@ -102,16 +104,14 @@ def readme_gallery_config() -> dict[str, object]:
     output_dir = Path(os.getenv("BPROC_EXAMPLES_OUT", PROJECT_ROOT / "examples"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    hdri_dir = Path(
-        os.getenv("BPROC_HDRI_DIR", "/run/media/matthias/68458e6f-73c7-439c-af08-2062edd89cbe/datasets/haven/hdris")
-    )
+    haven_dir = Path(os.getenv("BPROC_HAVEN_DIR", ""))
 
     return {
         "output_dir": output_dir,
         "resolution": int(os.getenv("BPROC_README_RES", "512")),
         "frames": int(os.getenv("BPROC_README_FRAMES", "72")),
-        "hdri_dir": hdri_dir,
-        "have_hdri": hdri_dir.exists(),
+        "haven_dir": haven_dir,
+        "have_hdri": (haven_dir / "hdris").exists(),
     }
 
 
@@ -120,25 +120,28 @@ def readme_gallery_config() -> dict[str, object]:
     not os.getenv("BPROC_EXAMPLES"),
     reason="Set BPROC_EXAMPLES=1 to rebuild the README gallery.",
 )
-def test_integration_readme_gallery(example: tuple[str, str, list[str]], tmp_path: Path, readme_gallery_config: dict[str, object]) -> None:
+def test_integration_readme_gallery(
+    example: tuple[str, str, list[str]], tmp_path: Path, readme_gallery_config: dict[str, object]
+) -> None:
     """Rebuild each README asset individually (opt-in via BPROC_EXAMPLES)."""
 
     name, ext, args = example
     output_dir: Path = readme_gallery_config["output_dir"]  # type: ignore[assignment]
     resolution: int = readme_gallery_config["resolution"]  # type: ignore[assignment]
     frames: int = readme_gallery_config["frames"]  # type: ignore[assignment]
-    hdri_dir: Path = readme_gallery_config["hdri_dir"]  # type: ignore[assignment]
+    haven_dir: Path = readme_gallery_config["haven_dir"]  # type: ignore[assignment]
     have_hdri: bool = readme_gallery_config["have_hdri"]  # type: ignore[assignment]
 
     if name == "hdri":
         if not have_hdri:
-            pytest.skip("HDRI directory not found; set BPROC_HDRI_DIR to enable HDRI example.")
-        args = [*args, "--backdrop", str(hdri_dir)]
+            pytest.skip("HDRI directory not found; set BPROC_HAVEN_DIR to enable HDRI example.")
+        args = [*args, "--backdrop", str(haven_dir)]
 
     out_path = output_dir / f"{name}.{ext}"
     full_args = [*args, "--save", str(out_path)]
     if name in {"turn", "tumble"}:
         full_args.extend(["--frames", str(frames)])
+        resolution = resolution // 2  # Animations rendered at half-res to save space/time
 
     _run_main_with_blenderproc(tmp_path, full_args, resolution=resolution)
 

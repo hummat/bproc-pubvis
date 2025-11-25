@@ -4,8 +4,10 @@
 import math
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import List, Literal, Optional, Tuple
+from uuid import uuid4
 
 import blenderproc as bproc  # noqa: E402
 import bpy
@@ -124,6 +126,24 @@ def get_all_blender_light_objects() -> List["bpy.types.Object"]:
         List[bpy.types.Object]: A list of Blender light objects.
     """
     return [obj for obj in bpy.context.scene.objects if obj.type == "LIGHT"]
+
+
+def _show_image(image: Image.Image, label: str = "render", path: Optional[Path] = None) -> None:
+    """Display an image via a persistent temp file to avoid Shotwell tempfile races."""
+    target = path
+    if target is None:
+        tmp_dir = Path(tempfile.gettempdir()) / "bproc_pubvis"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        target = tmp_dir / f"{label}_{uuid4().hex}.png"
+        image.save(target)
+    elif not target.exists():
+        image.save(target)
+
+    try:
+        subprocess.Popen(["xdg-open", str(target)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception as exc:  # pragma: no cover - best effort fallback
+        logger.warning(f"Failed to open image via xdg-open ({exc}); falling back to PIL viewer.")
+        image.show()
 
 
 def convert_to_lights(blender_objects: List["bpy.types.Object"]) -> List[bproc.types.Light]:
@@ -639,9 +659,11 @@ def setup_backdrop(
 
     if hdri_path:
         resolved_hdri = hdri_path
-        if (resolved_hdri / "hdri").exists():
+        if (resolved_hdri / "hdris").is_dir():
             # Allow passing a HAVEN dataset root instead of a single HDR file.
-            resolved_hdri = bproc.loader.get_random_world_background_hdr_img_path_from_haven(str(resolved_hdri))
+            resolved_hdri = Path(bproc.loader.get_random_world_background_hdr_img_path_from_haven(str(resolved_hdri)))
+        if not resolved_hdri.is_file():
+            raise FileNotFoundError(f"HDRI file not found: {resolved_hdri}")
         logger.debug(f"Setting HDRI backdrop to {Path(resolved_hdri).stem}")
         bproc.world.set_world_background_hdr_img(str(resolved_hdri), strength=bg_light)
         if gravity:
@@ -1260,10 +1282,12 @@ def render_depth(
     image = depth_to_image(depth=depth, cmap_name=cmap_name)
     if bg_color:
         image = set_background_color(image, bg_color)
-    if save:
-        image.save(Path(save).resolve())
+
+    save_path = Path(save).resolve() if save else None
+    if save_path:
+        image.save(save_path)
     if show:
-        image.show()
+        _show_image(image, label="depth", path=save_path)
 
 
 def create_mp4_with_ffmpeg(image_folder: Path, output_path: Path, fps: int = 20):
@@ -1408,9 +1432,10 @@ def render_color(
         image = Image.fromarray(image_np.astype(np.uint8))
         if bg_color:
             image = set_background_color(image, bg_color)
-        if save:
-            image.save(Path(save).resolve())
+        save_path = Path(save).resolve() if save else None
+        if save_path:
+            image.save(save_path)
         if show:
-            image.show()
+            _show_image(image, label="render", path=save_path)
         images.append(image)
     return images

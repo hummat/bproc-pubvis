@@ -139,7 +139,39 @@ class Config:
     """Random seed for reproducibility; use None for non-deterministic runs"""
 
     def __post_init__(self):
-        pass
+        def _boolish(val):
+            if isinstance(val, str):
+                lowered = val.lower()
+                if lowered == "true":
+                    return True
+                if lowered == "false":
+                    return False
+            return val
+
+        def _intish(val):
+            if isinstance(val, str):
+                try:
+                    return int(val)
+                except ValueError:
+                    return val
+            return val
+
+        def _floatish(val):
+            if isinstance(val, str):
+                try:
+                    return float(val)
+                except ValueError:
+                    return val
+            return val
+
+        # Normalize common CLI-union fields that Tyro can't disambiguate when given string tokens.
+        self.pcd = _intish(_boolish(self.pcd))
+        self.depth = _boolish(self.depth)
+        self.wireframe = _boolish(self.wireframe)
+        self.animate = _boolish(self.animate)
+        self.backdrop = _boolish(self.backdrop)
+        self.transparent = _boolish(self.transparent)
+        self.light = _floatish(self.light) if self.light is not None else None
 
 
 def run(cfg: Config):

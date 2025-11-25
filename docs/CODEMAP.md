@@ -46,8 +46,8 @@ Hyphenated flags map to fields 1:1 (e.g. `--bg-color` → `Config.bg_color`).
 | Keep custom material      | `--keep-material`          | `keep_material`         | Material branch in `setup_obj`                                 |
 | Object color              | `--color`                  | `color`                 | `set_color`, `get_color`, `set_look`                           |
 | Roughness                 | `--roughness`              | `roughness`             | Material setup in `setup_obj`, pcd material in `render_depth`  |
-| Point cloud mode          | `--pcd`                    | `pcd`                   | `load_data`, `setup_obj`, `render_depth`                       |
-| Depth rendering           | `--depth`                  | `depth`                 | Depth branch in `run`, `render_depth`                          |
+| Point cloud mode          | `--pcd True` / `--pcd 2048`| `pcd`                   | `load_data`, `setup_obj`, `render_depth`                       |
+| Depth rendering           | `--depth ray_trace`        | `depth`                 | Depth branch in `run`, `render_depth`                          |
 | Wireframe                 | `--wireframe`              | `wireframe`             | Wireframe section in `setup_obj`                               |
 | Keep mesh                 | `--keep-mesh`              | `keep_mesh`             | `load_data`, `setup_obj`, `render_depth`                       |
 | Point size / shape/color  | `--point-size`, `--point-shape`, `--point-color` | `point_size`, `point_shape`, `point_color` | `init_pointcloud`, `setup_obj`, `render_depth`   |

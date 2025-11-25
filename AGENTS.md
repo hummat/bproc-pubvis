@@ -34,7 +34,7 @@ This document describes how to work with `bproc-pubvis` as a contributor.
   (tests call `blenderproc run main.py --temp-dir <tmp> --data suzanne ...` under the hood).
 - Rebuild README/example renders (heavy, GPU-friendly): \
   `BPROC_INTEGRATION=1 BPROC_EXAMPLES=1 pytest tests/test_integration.py -k readme_gallery` \
-  Optional knobs: `BPROC_HDRI_DIR` for HDRIs, `BPROC_EXAMPLES_OUT` for output dir, `BPROC_README_RES` / `BPROC_README_FRAMES` for size/length.
+  Optional knobs: `BPROC_HAVEN_DIR` for HAVEN dataset HDRIs, `BPROC_EXAMPLES_OUT` for output dir, `BPROC_README_RES` / `BPROC_README_FRAMES` for size/length.
 - For visual behavior beyond integration tests, prefer example CLI snippets and screenshots in the README over pixel-perfect assertions.
 
 ## Tooling & Environment Notes

@@ -46,11 +46,11 @@ The following options can be added to:
 
 * **save** the rendered image: `--save path/to/output.png`
 * **export** the object: `--export path/to/output.obj` (use `.glb` for a web-friendly format)
-* render the mesh as **point cloud**: `--pcd`
-* render the mesh as **depth** image: `--depth`
-* render the mesh as **point cloud** from projected **depth** image: `--pcd` `--depth`
+* render the mesh as **point cloud**: `--pcd True` (or a target count, e.g. `--pcd 2048`)
+* render the mesh as **depth** image: `--depth ray_trace` (use `z_buffer` for Blender’s z-buffer)
+* render the mesh as **point cloud** from projected **depth** image: `--pcd True` `--depth ray_trace`
 * keep the mesh when rendering as point cloud or wireframe: `--keep-mesh` (used in the _Mesh + Depth_ example above)
-* create an **animation**: `--animate` (use `--frames` for length, default `72`, and `--fps` for playback speed, default `20`)
+* create an **animation**: `--animate turn` (use `--frames` for length, default `72`, and `--fps` for playback speed, default `20`)
 
 You can test you render settings using any of the `Blender` primitives (`monkey`, `cube`, `sphere`, `cone`,
 `cylinder`, ...) as the first argument.
@@ -59,8 +59,8 @@ Use `blenderproc run main.py -- --help` to see all available options and their d
 
 | Mesh                                     | Point cloud                   | Depth                                      |
 |------------------------------------------|-------------------------------|--------------------------------------------|
-| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png)      | ![mesh_depth](examples/depth.png)          |
-| `suzanne` (primitive, positional)        | `--pcd` `--light very_bright` | `--pcd 1024` `--point-size 0.01` `--depth` `--keep-mesh` |
+| ![mesh](examples/mesh.png)               | ![pcd](examples/pcd.png)      | ![mesh_depth](examples/mesh_depth.png)          |
+| `suzanne` (primitive, positional)        | `--pcd True` `--light very_bright` | `--pcd 1024` `--point-size 0.01` `--depth ray_trace` `--keep-mesh` |
 
 ## Basic Options
 
@@ -89,7 +89,7 @@ The background color can be changed using the `--bg-color` option.
 | Mesh                             | Point cloud                    | Background                           |
 |----------------------------------|--------------------------------|--------------------------------------|
 | ![mesh](examples/mesh_color.png) | ![pcd](examples/pcd_color.png) | ![mesh_depth](examples/bg_color.png) |
-| `--color bright_blue`            | `--pcd` `--color cool`         | `--bg-color pale_turquoise`          |
+| `--color bright_blue`            | `--pcd True` `--color cool`         | `--bg-color pale_turquoise`          |
 
 ### Background
 
@@ -133,13 +133,13 @@ The default shading is `flat` for meshes. Use `--shade` to change mesh shading; 
 
 ### Wireframe
 
-To render the object as a wireframe, use the `--wireframe` option.
+To render the object as a wireframe, use the `--wireframe` option (e.g. `--wireframe True` or `--wireframe red`).
 The wireframe color can be changed using `--wireframe color` when `--keep-mesh` is specified.
 
 | Wireframe                            | Mesh + Wireframe                        | Mesh + Wireframe (Color)                            |
 |--------------------------------------|-----------------------------------------|-----------------------------------------------------|
 | ![wireframe](examples/wireframe.png) | ![wf_mesh](examples/wireframe_mesh.png) | ![wf_mesh_color](examples/wireframe_mesh_color.png) |
-| `--wireframe`                        | `--wireframe` `--keep-mesh`             | `--wireframe red` `--keep-mesh`                     |
+| `--wireframe True`                        | `--wireframe True` `--keep-mesh`             | `--wireframe red` `--keep-mesh`                     |
 
 ### Gravity
 
@@ -158,7 +158,7 @@ To create an animation, use the `--animate` option. Control length with `--frame
 | Turn (default, loops)      | Tumble                         |
 |----------------------------|--------------------------------|
 | ![turn](examples/turn.gif) | ![tumble](examples/tumble.gif) |
-| `--animate`                | `--animate tumble`             |
+| `--animate turn`                | `--animate tumble`             |
 
 ### Interactive 3D Visualization
 
@@ -230,7 +230,7 @@ default). This is **opt-in** and separate from the basic integration flag:
 
 ```bash
 BPROC_INTEGRATION=1 BPROC_EXAMPLES=1 \
-BPROC_HDRI_DIR=/path/to/haven/hdris \
+BPROC_HAVEN_DIR=/path/to/haven \
 BPROC_EXAMPLES_OUT=examples \
 uv run pytest tests/test_integration.py -k readme_gallery
 ```
