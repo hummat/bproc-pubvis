@@ -24,16 +24,6 @@ The first call of `blenderproc` will download [`Blender`](https://blender.org). 
 installation, you can use
 `--custom-blender-path path/to/blender` (this also needs to be used for all subsequent calls of `blenderproc`).
 
-## Development
-
-- Create the env once: `uv sync --group dev` (installs the app plus dev tools and `fake-bpy-module` stubs for local tests).
-- After any code change, run the full tooling suite:
-  - Format: `uv run ruff format .`
-  - Lint: `uv run ruff check .`
-  - Type check: `uv run pyright`
-  - Tests: `uv run pytest` (set `BPROC_INTEGRATION=1` to include integration tests)
-- Re-run `uv sync --group dev` only when you intentionally want to refresh dependencies.
-
 ## Basic Usage
 
 To render a mesh (or point cloud if the input is one), simply run:
@@ -227,16 +217,17 @@ Some additional useful options include:
 
 Use `blenderproc run main.py` to see all available options and their descriptions.
 
-## Developer Setup
+## Development
 
 This repository is `pyproject.toml`-based and works well with [`uv`](https://github.com/astral-sh/uv):
 
-```bash
-uv sync --group dev   # create .venv and install app + dev deps
-uv run ruff check .
-uv run pyright
-uv run pytest         # runs unit tests with coverage
-```
+- Create the env once: `uv sync --group dev` (installs the app plus dev tools and `fake-bpy-module` stubs for local tests).
+- After any code change, run the full tooling suite:
+  - Format: `uv run ruff format .`
+  - Lint: `uv run ruff check .`
+  - Type check: `uv run pyright`
+  - Tests: `uv run pytest` (set `BPROC_INTEGRATION=1` to include integration tests)
+- Re-run `uv sync --group dev` only when you intentionally want to refresh dependencies.
 
 Integration tests exercise the BlenderProc CLI end-to-end and are opt-in:
 

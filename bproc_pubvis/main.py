@@ -135,7 +135,7 @@ class Config:
     """Enable verbose logging"""
     debug: bool = False
     """Enable debug mode"""
-    seed: Optional[int] = 1337
+    seed: Optional[int] = 123
     """Random seed for reproducibility; use None for non-deterministic runs"""
 
     def __post_init__(self):
