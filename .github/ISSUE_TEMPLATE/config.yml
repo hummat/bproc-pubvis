@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question / Help
+    url: https://github.com/hummat/bproc-pubvis/discussions
+    about: Ask questions and get help in Discussions
+  - name: README
+    url: https://github.com/hummat/bproc-pubvis#readme
+    about: Check the README for usage examples
