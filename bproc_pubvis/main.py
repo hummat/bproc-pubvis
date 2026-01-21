@@ -3,7 +3,7 @@ import random
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Optional, Tuple, Union, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 import tyro
@@ -35,7 +35,7 @@ class Config:
     lighting, camera positioning, and rendering quality.
     """
 
-    data: str | Path | Tuple[Path, Path]
+    data: str | Path | tuple[Path, Path]
     """Path to a single or two 3D object files (e.g. mesh + depth). Or name of BLender primitive."""
 
     # Object manipulation options
@@ -43,11 +43,11 @@ class Config:
     """Whether to center the object at the origin"""
     scale: bool | float = True
     """Whether to scale the object to fit within a unit cube or by how much to scale it"""
-    rotate: Optional[Tuple[float, float, float]] = (0, 0, -35)
+    rotate: tuple[float, float, float] | None = (0, 0, -35)
     """Initial rotation angles (x, y, z) in degrees"""
     gravity: bool = False
     """Whether to enable physics-based gravity simulation"""
-    animate: Optional[Union[Animation, str, bool]] = None
+    animate: Animation | str | bool | None = None
     """Animation type to apply (turn, tumble) or False for static render"""
     frames: int = 72
     """Number of frames to render for animations"""
@@ -55,79 +55,79 @@ class Config:
     """Frames per second for animations (GIF/MP4)"""
 
     # Material options
-    shade: Union[Shading, str] = Shading.FLAT
+    shade: Shading | str = Shading.FLAT
     """Shading style to apply to the object"""
     keep_material: bool = False
     """Whether to keep the custom material or apply the default one"""
-    color: Optional[Union[Tuple[float, float, float], Color, str]] = None
+    color: tuple[float, float, float] | Color | str | None = None
     """Color for the object in RGB format"""
-    roughness: Optional[float] = None
+    roughness: float | None = None
     """Material roughness value"""
 
     # Visualization options
-    pcd: Union[bool, int] = False
+    pcd: bool | int = False
     """Create a point cloud by sampling points from the surface of the mesh"""
-    depth: Union[Literal["ray_trace", "z_buffer"], bool] = False
+    depth: Literal["ray_trace", "z_buffer"] | bool = False
     """Visualize the given mesh as a (projected) depth map"""
-    wireframe: Union[Tuple[float, float, float], Color, str, bool] = False
+    wireframe: tuple[float, float, float] | Color | str | bool = False
     """Whether to render the object as a wireframe"""
     keep_mesh: bool = False
     """Whether to keep the mesh object after creating the point cloud"""
-    point_size: Optional[float] = None
+    point_size: float | None = None
     """Size of points when rendering point clouds"""
-    point_color: Optional[Union[Tuple[float, float, float], Color, str]] = None
+    point_color: tuple[float, float, float] | Color | str | None = None
     """Color for the points in RGB format"""
-    point_shape: Optional[Union[Shape, str]] = None
+    point_shape: Shape | str | None = None
     """Shape to use for point cloud visualization"""
-    subsample: Optional[int | float] = None
+    subsample: int | float | None = None
     """Number of points or fraction to subsample the point cloud"""
     subsample_method: Literal["random", "fps"] = "random"
     """Subsampling strategy: 'random' for uniform random, 'fps' for farthest point sampling"""
 
     # Camera options
-    cam_location: Tuple[float, float, float] = (1.5, 0, 1)
+    cam_location: tuple[float, float, float] = (1.5, 0, 1)
     """Camera position in 3D space"""
-    cam_offset: Tuple[float, float, float] = (0, 0, 0)
+    cam_offset: tuple[float, float, float] = (0, 0, 0)
     """Additional offset applied to camera position"""
-    resolution: Union[int, Tuple[int, int]] = 512
+    resolution: int | tuple[int, int] = 512
     """Output resolution (single int for square, tuple for rectangular)"""
-    fstop: Optional[float] = None
+    fstop: float | None = None
     """Camera f-stop value for depth of field"""
 
     # Environment options
-    backdrop: Union[bool, str] = True
+    backdrop: bool | str = True
     """Whether to include a backdrop plane"""
-    light: Optional[Union[Light, str, float]] = None
+    light: Light | str | float | None = None
     """Lighting intensity preset or custom value"""
-    bg_color: Optional[Union[Tuple[float, float, float], Color, str]] = None
+    bg_color: tuple[float, float, float] | Color | str | None = None
     """Background color in RGB format"""
     bg_light: float = 0.15
     """Background light intensity"""
-    transparent: Union[bool, float] = True
+    transparent: bool | float = True
     """Whether to render with transparency"""
 
     # Rendering options
-    look: Optional[Union[Look, str]] = None
+    look: Look | str | None = None
     """Visual style preset to apply"""
     exposure: float = 0
     """Global exposure adjustment"""
-    shadow: Optional[Shadow | str] = None
+    shadow: Shadow | str | None = None
     """Shadow type and intensity"""
-    ao: Optional[Union[bool, float]] = None
+    ao: bool | float | None = None
     """Ambient occlusion strength or disable"""
-    engine: Union[Engine, str] = Engine.CYCLES
+    engine: Engine | str = Engine.CYCLES
     """Rendering engine to use"""
-    noise_threshold: Optional[float] = None
+    noise_threshold: float | None = None
     """Cycles render noise threshold"""
-    samples: Optional[int] = None
+    samples: int | None = None
     """Number of render samples"""
 
     # Output options
-    save: Optional[Union[Path, str]] = None
+    save: Path | str | None = None
     """Output file path for rendered image"""
     show: bool = False
     """Whether to display the render"""
-    export: Optional[Union[Path, str]] = None
+    export: Path | str | None = None
     """Output file path for OBJ file export"""
 
     # Debug options
@@ -135,7 +135,7 @@ class Config:
     """Enable verbose logging"""
     debug: bool = False
     """Enable debug mode"""
-    seed: Optional[int] = 123
+    seed: int | None = 123
     """Random seed for reproducibility; use None for non-deterministic runs"""
 
     def __post_init__(self):
@@ -201,7 +201,7 @@ def run(cfg: Config):
         else None
     )
     point_shape = Shape.SPHERE if animate in [Animation.TURN, Animation.TUMBLE] else cfg.point_shape
-    pcd_setup = False if cfg.depth else (cfg.pcd if isinstance(cfg.pcd, int) and cfg.pcd > 1 else cfg.pcd)
+    pcd_setup = False if cfg.depth else cfg.pcd
     obj = setup_obj(
         obj_path=cfg.data,
         center=cfg.center,

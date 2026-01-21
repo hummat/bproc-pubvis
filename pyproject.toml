@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bproc-pubvis"
-version = "0.2.0"
+version = "0.3.0"
 description = "Publication-ready visualization of 3D objects and point clouds in seconds."
 authors = [{ name = "Matthias Humt", email = "github.gizzard320@passmail.net" }]
 license = { text = "GPL-3.0" }
@@ -65,7 +65,7 @@ line-length = 120
 src = ["."]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B"]
+select = ["E", "F", "I", "B", "UP", "RUF"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
@@ -94,3 +94,6 @@ stubPath = "typings"
 [tool.coverage.run]
 source = ["."]
 omit = ["tests/*", "*/site-packages/*", "__pycache__/*"]
+
+[tool.coverage.report]
+fail_under = 5

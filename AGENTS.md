@@ -6,6 +6,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 Read relevant `docs/agent/` files before proceeding:
 - `workflow.md` — **read before starting any feature** (issues, branching, PRs)
+- `releases.md` — **read before releasing** (changelog, versioning, conventional commits)
 
 ---
 
@@ -18,6 +19,7 @@ Read relevant `docs/agent/` files before proceeding:
 ```bash
 # Setup
 uv sync --group dev                    # Create venv and install deps (recommended)
+make deps                              # Alternative: portable script
 
 # Run application
 blenderproc run main.py path/to/obj --save out.png
@@ -25,9 +27,10 @@ blenderproc debug main.py ...          # Opens Blender GUI for inspection
 blenderproc run main.py -- --help      # CLI help (double-dash passes to Tyro)
 
 # Quality checks (run all after changes)
-uv run ruff format .                   # Format
-uv run ruff check .                    # Lint
-uv run pyright                         # Type check
+make check                             # fmt + lint + type + test (recommended)
+uv run ruff format .                   # Format only
+uv run ruff check .                    # Lint only
+uv run pyright                         # Type check only
 uv run pytest                          # Unit tests with coverage
 
 # Integration tests (opt-in, requires blenderproc CLI)
@@ -38,6 +41,10 @@ uv run pytest tests/test_main.py::test_run_basic -v
 
 # Rebuild example gallery (GPU-friendly)
 BPROC_INTEGRATION=1 BPROC_EXAMPLES=1 uv run pytest tests/test_integration.py -k readme_gallery
+
+# Build and release
+make build                             # Build sdist + wheel
+make release                           # Full release workflow (see docs/agent/releases.md)
 ```
 
 ## Architecture

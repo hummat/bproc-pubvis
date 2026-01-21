@@ -9,7 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from bproc_pubvis.main import Config, main, run  # noqa: E402  # re-export for compatibility
 
-__all__ = ["Config", "run", "main"]
+__all__ = ["Config", "main", "run"]
 
 if __name__ == "__main__":
     main()

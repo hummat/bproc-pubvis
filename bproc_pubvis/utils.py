@@ -1,15 +1,14 @@
 # pyright: ignorefile
-# ruff: noqa: E402
 
 import math
 import os
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple
+from typing import Literal
 from uuid import uuid4
 
-import blenderproc as bproc  # noqa: E402
+import blenderproc as bproc
 import bpy
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,9 +44,9 @@ def export_obj(obj: bproc.types.MeshObject, path: Path):
 
 
 def set_output_format(
-    look: Optional[Look | str] = None,
-    exposure: Optional[float] = None,
-    gamma: Optional[float] = None,
+    look: Look | str | None = None,
+    exposure: float | None = None,
+    gamma: float | None = None,
 ):
     """Sets the output format for the Blender scene.
 
@@ -115,11 +114,11 @@ def get_camera() -> bproc.types.Entity:
     return bproc.types.Entity(bpy.context.scene.camera)
 
 
-def get_camera_resolution() -> Tuple[int, int]:
+def get_camera_resolution() -> tuple[int, int]:
     return bpy.context.scene.render.resolution_x, bpy.context.scene.render.resolution_y
 
 
-def get_all_blender_light_objects() -> List["bpy.types.Object"]:
+def get_all_blender_light_objects() -> list["bpy.types.Object"]:
     """Retrieves all light objects in the current Blender scene.
 
     Returns:
@@ -128,7 +127,7 @@ def get_all_blender_light_objects() -> List["bpy.types.Object"]:
     return [obj for obj in bpy.context.scene.objects if obj.type == "LIGHT"]
 
 
-def _show_image(image: Image.Image, label: str = "render", path: Optional[Path] = None) -> None:
+def _show_image(image: Image.Image, label: str = "render", path: Path | None = None) -> None:
     """Display an image via a persistent temp file to avoid Shotwell tempfile races."""
     target = path
     if target is None:
@@ -146,7 +145,7 @@ def _show_image(image: Image.Image, label: str = "render", path: Optional[Path] 
         image.show()
 
 
-def convert_to_lights(blender_objects: List["bpy.types.Object"]) -> List[bproc.types.Light]:
+def convert_to_lights(blender_objects: list["bpy.types.Object"]) -> list[bproc.types.Light]:
     """Converts a list of Blender light objects to a list of BlenderProc light objects.
 
     Args:
@@ -158,7 +157,7 @@ def convert_to_lights(blender_objects: List["bpy.types.Object"]) -> List[bproc.t
     return [bproc.types.Light(blender_obj=obj) for obj in blender_objects]
 
 
-def get_all_light_objects() -> List[bproc.types.Light]:
+def get_all_light_objects() -> list[bproc.types.Light]:
     """Retrieves all light objects in the current Blender scene and converts them to BlenderProc light objects.
 
     Returns:
@@ -189,7 +188,7 @@ def bake_physics(frames_to_bake: int, gravity: bool = True):
 
 
 def init_renderer(
-    resolution: int | Tuple[int, int],
+    resolution: int | tuple[int, int],
     transparent: bool,
     look: Look | str | None,
     exposure: float,
@@ -248,22 +247,22 @@ def init_renderer(
 
 
 def setup_obj(
-    obj_path: str | Path | Tuple[Path, Path],
+    obj_path: str | Path | tuple[Path, Path],
     center: bool = True,
     scale: bool | float = True,
     pcd: bool | int = False,
-    wireframe: Tuple[float, float, float] | Color | str | bool = False,
+    wireframe: tuple[float, float, float] | Color | str | bool = False,
     keep_mesh: bool = False,
     set_material: bool = True,
-    color: Optional[Tuple[float, float, float] | Color | str] = None,
-    cam_location: Tuple[float, float, float] = (1.5, 0, 1),
-    roughness: Optional[float] = None,
-    point_shape: Optional[Shape | str] = None,
-    rotate: Optional[Tuple[float, float, float]] = None,
+    color: tuple[float, float, float] | Color | str | None = None,
+    cam_location: tuple[float, float, float] = (1.5, 0, 1),
+    roughness: float | None = None,
+    point_shape: Shape | str | None = None,
+    rotate: tuple[float, float, float] | None = None,
     shade: Shading | str = Shading.FLAT,
-    point_size: Optional[float] = None,
-    point_color: Optional[Tuple[float, float, float] | Color | str] = None,
-    subsample: Optional[int | float] = None,
+    point_size: float | None = None,
+    point_color: tuple[float, float, float] | Color | str | None = None,
+    subsample: int | float | None = None,
     subsample_method: Literal["random", "fps"] = "random",
 ) -> bproc.types.MeshObject:
     """Sets up a 3D object in BlenderProc.
@@ -305,7 +304,7 @@ def setup_obj(
         subsample_method=subsample_method,
     )
     # Treat `colors` as a local list separate from the incoming `color` arg for type-checking clarity.
-    colors: list[Tuple[float, float, float] | Color | str | None]
+    colors: list[tuple[float, float, float] | Color | str | None]
     if isinstance(data, tuple):
         colors = [color, "plasma_r" if point_color is None else point_color]
     else:
@@ -368,14 +367,14 @@ def setup_obj(
 
 
 def load_data(
-    obj_path: str | Path | Tuple[Path, Path] | Primitive,
+    obj_path: str | Path | tuple[Path, Path] | Primitive,
     center: bool = True,
     scale: bool | float = True,
     pcd: bool | int = False,
     keep_mesh: bool = False,
-    subsample: Optional[int | float] = None,
+    subsample: int | float | None = None,
     subsample_method: Literal["random", "fps"] = "random",
-) -> Trimesh | PointCloud | Tuple[Trimesh, PointCloud]:
+) -> Trimesh | PointCloud | tuple[Trimesh, PointCloud]:
     """Loads and processes 3D object data from various sources.
 
     This function can load 3D object data from a file path, a tuple of file paths, or a predefined primitive.
@@ -494,8 +493,8 @@ def load_data(
 
 
 def get_color(
-    color: Optional[Tuple[float, float, float] | Color | str],
-) -> np.ndarray | Tuple[float, float, float]:
+    color: tuple[float, float, float] | Color | str | None,
+) -> np.ndarray | tuple[float, float, float]:
     """Returns the RGB color value based on the input.
 
     This function converts various color input formats into a standardized RGB triple
@@ -536,8 +535,8 @@ def get_color(
 
 def set_color(
     obj: bproc.types.MeshObject,
-    color: Tuple[float, float, float] | Color | str,
-    camera_location: Tuple[float, float, float] | np.ndarray,
+    color: tuple[float, float, float] | Color | str,
+    camera_location: tuple[float, float, float] | np.ndarray,
     instancer: bool = False,
 ):
     """Sets the color of a BlenderProc mesh object.
@@ -595,15 +594,15 @@ def set_color(
         material.set_principled_shader_value("Base Color", [*get_color(color), 1])
 
 
-def set_background_color(image: Image.Image, color: Tuple[float, float, float] | Color | str):
+def set_background_color(image: Image.Image, color: tuple[float, float, float] | Color | str):
     rgb = get_color(color)
     background = Image.new("RGBA", image.size, tuple(int(c * 255) for c in rgb))
     return Image.alpha_composite(background, image)
 
 
 def set_look(
-    look: Optional[Look | str] = None,
-    color: Optional[Tuple[float, float, float] | Color | str] = None,
+    look: Look | str | None = None,
+    color: tuple[float, float, float] | Color | str | None = None,
     pcd: bool = False,
     depth: bool = False,
 ):
@@ -632,11 +631,11 @@ def setup_backdrop(
     obj: bproc.types.MeshObject,
     shadow_strength: Strength | str = Strength.MEDIUM,
     transparent: bool | float = True,
-    color: Optional[Tuple[float, float, float] | Color | str] = None,
-    hdri_path: Optional[Path] = None,
+    color: tuple[float, float, float] | Color | str | None = None,
+    hdri_path: Path | None = None,
     bg_light: float = 0.15,
     gravity: bool = False,
-    offset: Optional[np.ndarray] = None,
+    offset: np.ndarray | None = None,
 ):
     """Sets up a backdrop for the given object in the Blender scene.
 
@@ -726,8 +725,8 @@ def make_obj(mesh_or_pcd: Trimesh | PointCloud) -> bproc.types.MeshObject:
 
 def rotate_obj(
     obj: bproc.types.MeshObject,
-    rotate: Tuple[float, float, float],
-    frame: Optional[int] = None,
+    rotate: tuple[float, float, float],
+    frame: int | None = None,
     persistent: bool = False,
 ):
     """Rotates a BlenderProc mesh object.
@@ -838,8 +837,8 @@ def _pointcloud_with_geometry_nodes_and_instances(
 
 def _pointcloud_with_particle_system(
     obj: bproc.types.MeshObject,
-    point_size: Optional[float] = 0.004,
-    point_shape: Optional[Shape | str] = Shape.SPHERE,
+    point_size: float | None = 0.004,
+    point_shape: Shape | str | None = Shape.SPHERE,
 ):
     """Sets up a point cloud using a particle system.
 
@@ -886,11 +885,11 @@ def _pointcloud_with_particle_system(
 
 def init_pointcloud(
     obj: bproc.types.MeshObject,
-    point_size: Optional[float] = None,
-    point_shape: Optional[Shape | str] = None,
+    point_size: float | None = None,
+    point_shape: Shape | str | None = None,
     use_instance: bool = False,
     use_particle_system: bool = False,
-    subsample: Optional[int | float] = None,
+    subsample: int | float | None = None,
     subsample_method: Literal["random", "fps"] = "random",
 ):
     """Initializes a point cloud in BlenderProc.
@@ -948,7 +947,7 @@ def init_pointcloud(
         )
 
 
-def add_ambient_occlusion(obj: Optional[bproc.types.MeshObject] = None, distance: float = 0.2, strength: float = 0.5):
+def add_ambient_occlusion(obj: bproc.types.MeshObject | None = None, distance: float = 0.2, strength: float = 0.5):
     """Adds ambient occlusion to the Blender scene or a specific object.
 
     If no object is provided, it configures the scene to use ambient occlusion
@@ -1060,9 +1059,9 @@ def make_lights(
 
 def make_camera(
     obj: bproc.types.MeshObject,
-    location: Tuple[float, float, float] | np.ndarray = (1.5, 0, 1),
-    offset: Optional[Tuple[float, float, float] | np.ndarray] = None,
-    fstop: Optional[float] = None,
+    location: tuple[float, float, float] | np.ndarray = (1.5, 0, 1),
+    offset: tuple[float, float, float] | np.ndarray | None = None,
+    fstop: float | None = None,
 ):
     """Sets up the camera in the Blender scene.
 
@@ -1110,7 +1109,7 @@ def _target_count(n: int, count_or_fraction: int | float) -> int:
     """
     if isinstance(count_or_fraction, float):
         if 0 < count_or_fraction <= 1:
-            m = int(math.ceil(n * count_or_fraction))
+            m = math.ceil(n * count_or_fraction)
         else:
             m = int(count_or_fraction)
     else:
@@ -1173,19 +1172,19 @@ def render_depth(
     obj: bproc.types.MeshObject,
     pcd: bool | int = False,
     keep_mesh: bool = False,
-    color: Optional[Tuple[float, float, float] | Color | str] = None,
-    cam_location: Tuple[float, float, float] = (1.5, 0, 1),
-    roughness: Optional[float] = None,
-    point_shape: Optional[Shape | str] = None,
-    point_size: Optional[float] = None,
-    subsample: Optional[int | float] = None,
+    color: tuple[float, float, float] | Color | str | None = None,
+    cam_location: tuple[float, float, float] = (1.5, 0, 1),
+    roughness: float | None = None,
+    point_shape: Shape | str | None = None,
+    point_size: float | None = None,
+    subsample: int | float | None = None,
     subsample_method: Literal["random", "fps"] = "random",
     noise: float = 0.002,
-    bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
+    bg_color: tuple[float, float, float] | Color | str | None = None,
     ray_trace: bool = True,
-    save: Optional[Path] = None,
+    save: Path | None = None,
     show: bool = False,
-) -> Optional[bproc.types.MeshObject]:
+) -> bproc.types.MeshObject | None:
     """Renders a depth map of the given object and optionally converts it to a point cloud.
 
     This function renders a depth map of the provided mesh object using ray tracing. It can either
@@ -1301,7 +1300,7 @@ def create_mp4_with_ffmpeg(image_folder: Path, output_path: Path, fps: int = 20)
         output_path: The path where the output MP4 video will be saved.
         fps: The frames per second for the output video.
     """
-    image_files: List[Path] = sorted(image_folder.glob("*.png"))
+    image_files: list[Path] = sorted(image_folder.glob("*.png"))
     if not image_files:
         raise ValueError("No images found in the specified folder.")
 
@@ -1327,7 +1326,7 @@ def make_animation(
     frames: int = 72,
     fps: int = 20,
     save: Path = Path("animation.gif"),
-    bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
+    bg_color: tuple[float, float, float] | Color | str | None = None,
     debug: bool = False,
 ):
     """Creates an animation of the given object.
@@ -1403,11 +1402,11 @@ def make_animation(
 
 
 def render_color(
-    bg_color: Optional[Tuple[float, float, float] | Color | str] = None,
-    save: Optional[Path] = None,
+    bg_color: tuple[float, float, float] | Color | str | None = None,
+    save: Path | None = None,
     show: bool = False,
     progress: bool = True,
-) -> List[Image]:
+) -> list[Image]:
     """Renders the scene and returns a list of images.
 
     This function renders the current BlenderProc scene and returns a list of images.
@@ -1425,8 +1424,8 @@ def render_color(
     with stdout_redirected(enabled=not progress):
         data = bproc.renderer.render()
 
-    images: List[Image] = list()
-    images_np: List[np.ndarray] = data["colors"]
+    images: list[Image] = list()
+    images_np: list[np.ndarray] = data["colors"]
     for image_np in images_np:
         image = Image.fromarray(image_np.astype(np.uint8))
         if bg_color:
