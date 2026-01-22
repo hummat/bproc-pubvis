@@ -96,4 +96,4 @@ source = ["."]
 omit = ["tests/*", "*/site-packages/*", "__pycache__/*"]
 
 [tool.coverage.report]
-fail_under = 5
+fail_under = 38
