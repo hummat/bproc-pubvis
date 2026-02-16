@@ -5,7 +5,7 @@ This file provides guidance to AI coding agents when working with code in this r
 ## Conventions
 
 Read relevant `docs/agent/` files before proceeding:
-- `workflow.md` — **read before starting any feature** (issues, branching, PRs)
+- `workflow.md` — **read before creating issues, PRs, or branches** (templates, labels, naming)
 - `releases.md` — **read before releasing** (changelog, versioning, conventional commits)
 
 ---
