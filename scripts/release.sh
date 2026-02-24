@@ -68,7 +68,7 @@ echo "Running checks..."
 make check
 
 echo "Running integration tests..."
-BPROC_INTEGRATION=1 uv run pytest tests/test_integration.py
+BPROC_INTEGRATION=1 uv run pytest tests/test_integration.py --no-cov
 
 echo "Building dist..."
 make build
