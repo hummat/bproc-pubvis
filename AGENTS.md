@@ -12,19 +12,20 @@ Read relevant `docs/agent/` files before proceeding:
 
 ## Project Overview
 
-**bproc-pubvis** generates publication-ready 3D visualizations of meshes and point clouds using BlenderProc/Blender. Primary invocation: `blenderproc run main.py <mesh_or_primitive> [options...]`
+**bproc-pubvis** generates publication-ready 3D visualizations of meshes and point clouds using BlenderProc/Blender. Primary invocation: `uv run blenderproc run main.py --data <mesh_or_primitive> [options...]`
 
 ## Development Commands
 
+Requires [`uv`](https://docs.astral.sh/uv/getting-started/installation/).
+
 ```bash
 # Setup
-uv sync --group dev                    # Create venv and install deps (recommended)
-make deps                              # Alternative: portable script
+make deps                              # uv sync --group dev + git hooks
 
 # Run application
-blenderproc run main.py path/to/obj --save out.png
-blenderproc debug main.py ...          # Opens Blender GUI for inspection
-blenderproc run main.py -- --help      # CLI help (double-dash passes to Tyro)
+uv run blenderproc run main.py --data path/to/obj --save out.png
+uv run blenderproc debug main.py ...   # Opens Blender GUI for inspection
+uv run blenderproc run main.py -- --help  # CLI help (double-dash passes to Tyro)
 
 # Quality checks (run all after changes)
 make check                             # fmt + lint + type + test (recommended)

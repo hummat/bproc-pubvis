@@ -13,11 +13,11 @@ interactive version of this README!_
 
 ## Installation
 
-Use the BlenderProc-managed Blender (the only supported workflow):
+Requires [`uv`](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.11.
 
 ```bash
-pip install git+https://github.com/hummat/bproc-pubvis.git
-blenderproc pip install loguru tyro
+uv pip install git+https://github.com/hummat/bproc-pubvis.git
+uv run blenderproc pip install loguru tyro
 ```
 
 The first call of `blenderproc` will download [`Blender`](https://blender.org). If you already have a local
@@ -29,7 +29,7 @@ installation, you can use
 To render a mesh (or point cloud if the input is one), simply run:
 
 ```bash
-blenderproc run main.py path/to/3d.obj
+uv run blenderproc run main.py --data path/to/3d.obj
 ```
 
 The following options can be added to:
@@ -45,7 +45,7 @@ The following options can be added to:
 You can test you render settings using any of the `Blender` primitives (`monkey`, `cube`, `sphere`, `cone`,
 `cylinder`, ...) as the first argument.
 
-Use `blenderproc run main.py -- --help` to see all available options and their descriptions (the `--` passes flags through BlenderProc to Tyro).
+Use `uv run blenderproc run main.py -- --help` to see all available options and their descriptions (the `--` passes flags through BlenderProc to Tyro).
 
 | Mesh                                     | Point cloud                   | Depth                                      |
 |------------------------------------------|-------------------------------|--------------------------------------------|
@@ -85,7 +85,7 @@ The background color can be changed using the `--bg-color` option.
 
 By default, the background is transparent. To change this, use the `--bg-color` option as shown above. Additionally,
 set `--transparent False` to render the backdrop object. To use HDRI images as backdrops, use `--backdrop path/to/hdri`.
-HDRIs can be obtained e.g. via `blenderproc download haven path/to/save/dir`.
+HDRIs can be obtained e.g. via `uv run blenderproc download haven path/to/save/dir`.
 
 | Backdrop                           | Colored backdrop                           | HDRI backdrop                               |
 |------------------------------------|--------------------------------------------|---------------------------------------------|
@@ -196,19 +196,29 @@ Some additional useful options include:
 * `--look`, `--engine`, `--samples`, `--noise-threshold`, `--exposure`: Advanced render controls.
 * `--frames`, `--fps`: Animation length and playback speed.
 
-Use `blenderproc run main.py` to see all available options and their descriptions.
+Use `uv run blenderproc run main.py` to see all available options and their descriptions.
 
 ## Development
 
-This repository is `pyproject.toml`-based and works well with [`uv`](https://github.com/astral-sh/uv):
+This repository uses [`uv`](https://docs.astral.sh/uv/) for dependency management and task running.
 
-- Create the env once: `uv sync --group dev` (installs the app plus dev tools and `fake-bpy-module` stubs for local tests).
-- After any code change, run the full tooling suite:
-  - Format: `uv run ruff format .`
-  - Lint: `uv run ruff check .`
-  - Type check: `uv run pyright`
-  - Tests: `uv run pytest` (set `BPROC_INTEGRATION=1` to include integration tests)
-- Re-run `uv sync --group dev` only when you intentionally want to refresh dependencies.
+```bash
+# Clone and set up
+git clone https://github.com/hummat/bproc-pubvis.git
+cd bproc-pubvis
+make deps          # runs uv sync --group dev + configures git hooks
+```
+
+After any code change, run the full tooling suite via `make check`, or individually:
+
+```bash
+uv run ruff format .   # Format
+uv run ruff check .    # Lint
+uv run pyright         # Type check
+uv run pytest          # Unit tests (set BPROC_INTEGRATION=1 for integration tests)
+```
+
+Re-run `make deps` only when you intentionally want to refresh dependencies.
 
 Integration tests exercise the BlenderProc CLI end-to-end and are opt-in:
 
@@ -234,7 +244,7 @@ See `AGENTS.md` for contributor-focused details (tooling, PR expectations, and h
 
 ## Debugging
 
-`BlenderProc` supports visual debugging inside `Blender` using `blenderproc debug` instead of `blenderproc run`.
+`BlenderProc` supports visual debugging inside `Blender` using `uv run blenderproc debug` instead of `uv run blenderproc run`.
 Adding `--debug` will further disable rendering and only set up the scene.
 
 ## Credits

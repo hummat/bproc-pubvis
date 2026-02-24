@@ -73,7 +73,7 @@ def test_get_color_and_background_composite():
     base = Image.new("RGBA", (2, 1), (0, 0, 0, 0))
     base.putpixel((1, 0), (0, 0, 0, 255))
     result = set_background_color(base, Color.RED)
-    pixels_raw = cast(Sequence[tuple[int, int, int, int]], result.convert("RGBA").getdata())
+    pixels_raw = cast(Sequence[tuple[int, int, int, int]], result.convert("RGBA").get_flattened_data())
     res_pixels = list(pixels_raw)
     assert res_pixels[0] == (255, 0, 0, 255)  # filled from background color
     assert res_pixels[1] == (0, 0, 0, 255)  # original opaque pixel preserved

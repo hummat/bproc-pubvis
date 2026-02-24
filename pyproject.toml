@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bproc-pubvis"
-version = "0.3.0"
+version = "0.3.1"
 description = "Publication-ready visualization of 3D objects and point clouds in seconds."
 authors = [{ name = "Matthias Humt", email = "github.gizzard320@passmail.net" }]
 license = { text = "GPL-3.0" }
@@ -24,15 +24,6 @@ dependencies = [
     "scipy>=1.13.1",
     "tyro>=0.8.0",
     "trimesh>=4.4.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.3.0",
-    "pytest-cov>=5.0.0",
-    "ruff>=0.6.0",
-    "pyright>=1.1.385",
-    "fake-bpy-module-4.2",
 ]
 
 [dependency-groups]

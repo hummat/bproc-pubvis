@@ -67,6 +67,9 @@ echo "Release: $TAG"
 echo "Running checks..."
 make check
 
+echo "Running integration tests..."
+BPROC_INTEGRATION=1 uv run pytest tests/test_integration.py
+
 echo "Building dist..."
 make build
 

@@ -21,7 +21,7 @@ lint:
 	@uv run ruff check .
 
 type:
-	@uv run pyright
+	@PYRIGHT_PYTHON_FORCE_VERSION=latest uv run pyright
 
 test:
 	@uv run pytest
