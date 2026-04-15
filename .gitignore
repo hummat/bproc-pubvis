@@ -171,3 +171,5 @@ cython_debug/
 CLAUDE.md
 GEMINI.md
 QWEN.md
+
+.claude/settings.local.json
