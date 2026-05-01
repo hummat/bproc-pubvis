@@ -85,7 +85,7 @@ jobs:
 
       - name: Comment on Codecov failure (PRs)
         if: ${{ github.event_name == 'pull_request' && steps.codecov.outcome == 'failure' }}
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
